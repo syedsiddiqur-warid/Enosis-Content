@@ -1,0 +1,36 @@
+Timestamp,Name:,"Bachelor's: (Degree Name, University Name, Year)","Master's: (Degree Name, University Name, Year)","Years of Work Experience:
+**Please provide your total work experience of your Previous Work Place, if any (not the total work experience). Otherwise, write N/A.**",Years of Experience in Enosis:,"Major Expertise : 
+ 1. Core specialization (backend / frontend / full-stack / mobile etc.)
+…","Achievements & Certifications: (ex: Scored 9,000 in GitHub, Google AdWords Certification, etc.)","Programming Language: (ex: JavaScript, C, C++, PHP)","Web Technologies: (ex: Html, CSS, Bootstrap, JavaScript)","Frameworks: (ex: React.js, Node.js, Express.js)","Library: (ex: Redux, Socket.IO, Mongoose)","Database: (ex: MySQL, MongoDB)","Other Tools: (ex: Microsoft Visual Studio, Eclipse)
+(No need to mention Git/GitHub)","Project Management: (ex: Basecamp, Jira, ClickUp)","Cloud & Platforms: (ex: AWS Lambda, Firebase, IBM Cloud)","Project 1 Name: 
+(Example: 
+Project Name: Dental Management Software
+Type: Web Application)","Project 1 Brief & Features:
+
+(Example: …)","Client Name: 
+**Please provide the name of the project's client here, if the project was completed under Enosis. Otherwise, please write N/A and move forward to the next section.**",Project 1 Responsibilities: (Briefly describe your contribution in the project),"Core Technologies used in project 1: (Example: Java, Spring Boot, Advanced Algorithms, Oracle)",Industry / Domain: (FinTech / National Revenue Authority),"Project 2 Name: 
+(Example: 
+Project Name: Dental Management Software
+Type: Web Application)","Project 2 Brief & Features:
+
+(Example: …)","Client Name: 
+**Please provide the name of the project's client here, if the project was completed under Enosis. Otherwise, please write N/A and move forward to the next section.**",Project 2 Responsibilities: (Briefly describe your contribution in the project),"Core Technologies used in project 2: (Example: Java, Spring Boot, Advanced Algorithms, Oracle)",Industry / Domain: (FinTech / National Revenue Authority),"Project 3 Name: 
+(Example: 
+Project Name: Dental Management Software
+Type: Web Application)","Project 3 Brief & Features:
+
+(Example: …)","Client Name: 
+**Please provide the name of the project's client here, if the project was completed under Enosis. Otherwise, please write N/A and move forward to the next section.**",Project 3 Responsibilities: (Briefly describe your contribution in the project),"Core Technologies used in project 3: (Example: Java, Spring Boot, Advanced Algorithms, Oracle)",Industry / Domain: (FinTech / National Revenue Authority)
+2/10/2026 10:05:00,Rafiq Hasan,"BSc in CSE, Sample University of Engineering, 2019",N/A,N/A,3,Full-stack engineer working on enterprise web apps.,N/A,"C#, JavaScript","HTML, CSS","ASP.NET Core, React",N/A,SQL Server,Visual Studio,Jira,N/A,Project Name: Clinic Scheduler; Type: Web Application,Project Brief: A scheduler for clinics.,Sample Health Inc.,- Built the booking API,"C#, ASP.NET Core, SQL Server",Healthcare,N/A,,N/A,N/A,N/A,N/A,N/A,,N/A,N/A,N/A,N/A
+3/2/2026 14:22:10,Nadia Islam,"Bachelor of Science in Computer Science & Engineering, Sample Institute of Technology, Year 2018 - 2022","Masters of Science in CSE, Sample University, 2024 - Present",1,2.5,I am experienced in cross-platform mobile development with Flutter and native Android. My strengths include offline-first architecture and UI performance. I have worked on eCommerce and FinTech apps.,"- Google Associate Android Developer Certification
+- Champion, Sample Inter-University Programming Contest 2021","Dart, Kotlin, Java",N/A,"Flutter, Jetpack Compose","Riverpod, Retrofit, ""Dio""","SQLite, Firestore","Android Studio, Figma, git","Jira, ClickUp",Firebase,Project Name: Wallet App; Type: Mobile Application,"Project Brief: A mobile wallet for bill payments and transfers.
+
+Project Feature: QR payments, bill pay, transaction history, biometric login",Sample Fintech Ltd.,"- Built the QR payment flow
+- Implemented biometric login
+- Improved app start time by 45%","Flutter, Dart, Riverpod, Firebase",FinTech,Grocery Delivery App,"A cross-platform grocery app with live order tracking. Project features: cart, checkout, live tracking.",N/A,- Built the cart and checkout - Added offline product catalog - Wrote widget tests,"Flutter, Dart, SQLite",E-commerce,N/A,,N/A,N/A,N/A,N/A
+3/5/2026 9:15:42,Rafiq  Hasan,"BSc in CSE, Sample University of Engineering, 2019",N/A,1.5,3.5,Full-stack engineer (.NET and React) on enterprise and SaaS web apps. Strong in API design and SQL performance.,Microsoft Certified: Azure Developer Associate,"C#, TypeScript, JavaScript","HTML, CSS, Bootstrap","ASP.NET Core, React, Entity Framework Core","Redux, xUnit, Moq","SQL Server, PostgreSQL","Visual Studio, Postman, Docker",Jira,"Azure App Service, Azure Functions",Project Name: Clinic Scheduler; Type: Web Application,"Project Brief: A scheduling platform for multi-location clinics.
+Project Features: online booking, reminders, staff calendars",Sample Health Inc.,"- Designed and built the booking REST API
+- Cut calendar query time by 60% with indexing
+- Wrote integration tests with xUnit","C#, ASP.NET Core, EF Core, SQL Server, React",Healthcare,Project Name: Inventory Sync Service; Type: Backend Service,Syncs stock levels between a warehouse system and online stores.,Sample Retail Co.,"- Built the sync worker with Azure Functions
+- Added retry and dead-letter handling","C#, Azure Functions, PostgreSQL",Retail,N/A,,N/A,N/A,N/A,N/A
+3/8/2026 16:40:03,Tanvir Ahmed,"B.Sc. in Software Engineering, Sample Science and Technology University, 2020",N/A,2,1,SQA engineer focused on web and API test automation and CI pipelines.,ISTQB Certified Tester Foundation Level,"Java, TypeScript",N/A,"Selenium, Playwright, TestNG",RestAssured,MySQL,"Postman, JMeter, Jenkins","Jira, TestRail",N/A,Project Name: Insurance Claims Portal; Type: Web Application,Claims submission and tracking portal for policyholders.,Sample Insurance Group,- Automated 250 regression tests with Playwright - Set up nightly runs in Jenkins,"Playwright, TypeScript, Jenkins",Insurance,N/A,,N/A,N/A,N/A,N/A,N/A,,N/A,N/A,N/A,N/A
