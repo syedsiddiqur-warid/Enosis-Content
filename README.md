@@ -27,7 +27,16 @@ npm run db:setup            # applies migrations and seeds 5 fictional resources
 npm run dev
 ```
 
-Open http://localhost:3000, enter an admin email, then open the **dev inbox** at http://localhost:3000/dev/inbox to click the sign-in link. In dev mode no email leaves your machine.
+On Windows PowerShell, run the commands one per line from the `talent-profile-studio` folder (PowerShell 5 doesn't accept `&&`), use `copy` instead of `cp`, and type `npm.cmd` instead of `npm` if PowerShell says "running scripts is disabled":
+
+```powershell
+cd "D:\Enosis Content\talent-profile-studio"
+npm.cmd run dev
+```
+
+The app always runs on port **3100** (port 3000 is often taken by other local apps).
+
+Open http://localhost:3100, enter an admin email, then open the **dev inbox** at http://localhost:3100/dev/inbox to click the sign-in link. In dev mode no email leaves your machine.
 
 > PGlite allows one process at a time. Stop `npm run dev` before running `npm run db:*` scripts.
 > To start over, stop the server, delete `.data/`, and run `npm run db:setup` again.
