@@ -63,10 +63,16 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Pr
         {sp.archived === "1" && <input type="hidden" name="archived" value="1" />}
       </form>
 
+      <form action="/admin/requests/new" method="get">
+      <div className="mb-2 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+        <button className={buttonClass("secondary")}>Send update request to selected</button>
+        <span>Tick people below, or use &quot;Stale only&quot; to find records that need refreshing.</span>
+      </div>
       <Card className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[760px] text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
+              <th className="w-10 py-2.5 pl-4"><span className="sr-only">Select</span></th>
               <th className="px-4 py-2.5 font-medium">Name</th>
               <th className="px-4 py-2.5 font-medium">Title</th>
               <th className="px-4 py-2.5 font-medium">Experience</th>
@@ -80,6 +86,9 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Pr
               const years = totalYears(r);
               return (
                 <tr key={r.id} className="hover:bg-slate-50">
+                  <td className="py-3 pl-4">
+                    <input type="checkbox" name="ids" value={r.id} aria-label={`Select ${r.name}`} />
+                  </td>
                   <td className="px-4 py-3">
                     <Link href={`/admin/resources/${r.id}`} className="font-medium text-brand hover:underline">
                       {r.name}
@@ -113,7 +122,7 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Pr
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
                   No resources match. Try clearing the filters, or <Link href="/admin/import" className="text-brand underline">import your Google Form CSV</Link>.
                 </td>
               </tr>
@@ -121,6 +130,7 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Pr
           </tbody>
         </table>
       </Card>
+      </form>
       <p className="mt-3 text-sm">
         {sp.archived === "1" ? (
           <Link href="/admin/resources" className="text-brand underline">

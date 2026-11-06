@@ -57,6 +57,12 @@ export default async function DevInboxPage() {
             <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">
               <Linkified text={e.text} />
             </pre>
+            {e.html && (
+              <details className="mt-3 text-sm">
+                <summary className="cursor-pointer text-slate-500">View as the recipient sees it (HTML)</summary>
+                <iframe srcDoc={e.html} sandbox="" title={`HTML version of ${e.subject}`} className="mt-2 h-[460px] w-full rounded border border-slate-200" />
+              </details>
+            )}
           </Card>
         ))}
       </div>

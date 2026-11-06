@@ -2,6 +2,7 @@ import "server-only";
 import { getDb } from "@/db";
 import { outboundEmails } from "@/db/schema";
 import { env } from "@/lib/env";
+import { providers, type ProviderMessage } from "./providers";
 
 export type OutgoingEmail = {
   to: string;
@@ -13,17 +14,16 @@ export type OutgoingEmail = {
    * so they only ever reach the dev inbox and are blocked by real providers.
    */
   recipientVerified: boolean;
+  templateKey?: string;
+  requestId?: string;
 };
 
 export type SendResult = { status: "dev_inbox" | "sent" | "blocked" | "failed"; error?: string };
 
-/**
- * Phase 1 ships the dev provider (messages are stored and shown at /dev/inbox).
- * Real providers (Resend, Postmark, SendGrid) plug in here in phase 2.
- */
+/** Sends through EMAIL_PROVIDER and records every message (the record is the dev inbox in dev mode). */
 export async function sendEmail(email: OutgoingEmail): Promise<SendResult> {
-  const db = await getDb();
   let result: SendResult;
+  let providerMessageId: string | undefined;
 
   if (env.emailProvider === "dev") {
     result = { status: "dev_inbox" };
@@ -31,9 +31,18 @@ export async function sendEmail(email: OutgoingEmail): Promise<SendResult> {
   } else if (!email.recipientVerified) {
     result = { status: "blocked", error: "Recipient email is a sample/unverified address." };
   } else {
-    result = { status: "failed", error: `Email provider "${env.emailProvider}" is not implemented yet.` };
+    const provider = providers[env.emailProvider];
+    const message: ProviderMessage = { from: env.emailFrom, to: email.to, subject: email.subject, text: email.text, html: email.html };
+    try {
+      providerMessageId = await provider(message);
+      result = { status: "sent" };
+    } catch (err) {
+      result = { status: "failed", error: err instanceof Error ? err.message : String(err) };
+      console.error(`[email] ${env.emailProvider} failed for ${email.to}:`, result.error);
+    }
   }
 
+  const db = await getDb();
   await db.insert(outboundEmails).values({
     to: email.to,
     subject: email.subject,
@@ -42,6 +51,9 @@ export async function sendEmail(email: OutgoingEmail): Promise<SendResult> {
     provider: env.emailProvider,
     status: result.status,
     error: result.error,
+    providerMessageId,
+    templateKey: email.templateKey,
+    requestId: email.requestId,
   });
   return result;
 }

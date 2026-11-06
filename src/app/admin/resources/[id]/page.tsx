@@ -15,6 +15,8 @@ import {
   type SectionUpdates,
 } from "@/lib/resources/types";
 import { setArchivedAction } from "../actions";
+import { RequestActions, RequestStatusBadge } from "@/components/request-ui";
+import { listRequests } from "@/lib/links/service";
 
 export const dynamic = "force-dynamic";
 
@@ -46,12 +48,14 @@ function Block({ title, section, updates, children }: { title: string; section?:
 
 const Empty = () => <p className="text-sm text-slate-400">Nothing recorded yet.</p>;
 
-export default async function ResourcePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ResourcePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ notice?: string }> }) {
   const { id } = await params;
+  const { notice } = await searchParams;
   const db = await getDb();
   const r = await getResource(db, id).catch(() => null);
   if (!r) notFound();
   const versions = await getVersions(db, id);
+  const requests = await listRequests(db, { resourceId: id, limit: 5 });
   const years = totalYears(r);
   const availability = AVAILABILITY_STATUSES.find((s) => s.key === r.availabilityStatus)?.label;
 
@@ -69,6 +73,11 @@ export default async function ResourcePage({ params }: { params: Promise<{ id: s
         }
         actions={
           <>
+            {!r.archivedAt && (
+              <Link href={`/admin/requests/new?ids=${r.id}`} className={buttonClass("secondary")}>
+                Send update request
+              </Link>
+            )}
             <form action={setArchivedAction}>
               <input type="hidden" name="id" value={r.id} />
               <input type="hidden" name="archived" value={r.archivedAt ? "false" : "true"} />
@@ -80,6 +89,7 @@ export default async function ResourcePage({ params }: { params: Promise<{ id: s
           </>
         }
       />
+      {notice && <p className="mb-4 rounded-md bg-brand-soft p-3 text-sm text-brand">{notice}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[1fr_18rem]">
         <div className="space-y-5">
@@ -207,6 +217,30 @@ export default async function ResourcePage({ params }: { params: Promise<{ id: s
         </div>
 
         <aside className="space-y-5">
+          <Card className="p-4 text-sm">
+            <h3 className="mb-2 font-semibold">Update requests</h3>
+            {requests.length === 0 ? (
+              <p className="text-slate-500">None sent yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {requests.map((q) => (
+                  <li key={q.id} className="text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <RequestStatusBadge request={q} />
+                      <span className="text-slate-700">{q.context.roleTitle}</span>
+                    </div>
+                    <div className="mt-0.5 text-slate-500">
+                      Sent {q.createdAt.toLocaleDateString()} · due {q.dueDate} · opened {q.openCount}×
+                    </div>
+                    <RequestActions request={q} back={`/admin/resources/${r.id}`} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link href="/admin/requests" className="mt-2 inline-block text-xs text-brand underline">
+              All requests and activity
+            </Link>
+          </Card>
           <Card className="p-4 text-sm">
             <h3 className="mb-2 font-semibold">Contact</h3>
             <p className="break-all">{r.email}</p>

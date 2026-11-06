@@ -5,7 +5,9 @@ import { devInboxEnabled } from "@/lib/env";
 
 const nav = [
   { href: "/admin/resources", label: "Resources" },
+  { href: "/admin/requests", label: "Requests" },
   { href: "/admin/import", label: "Import" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

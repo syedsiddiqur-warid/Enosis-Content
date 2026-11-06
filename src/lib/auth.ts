@@ -1,6 +1,6 @@
 import "server-only";
 import { and, eq, gt, isNull } from "drizzle-orm";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { getDb } from "@/db";
@@ -8,21 +8,11 @@ import { loginTokens, sessions } from "@/db/schema";
 import { hashToken, randomToken } from "@/lib/crypto";
 import { sendEmail } from "@/lib/email/mailer";
 import { env } from "@/lib/env";
+import { baseUrl } from "@/lib/url";
 
 export const SESSION_COOKIE = "tps_session";
 const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-
-/**
- * Base URL for emailed links. Production always uses APP_URL (never the Host header, which a
- * client controls). In development, use the address the app is actually running on, since the port can vary.
- */
-async function baseUrl() {
-  if (env.isProduction) return env.appUrl;
-  const h = await headers();
-  const host = h.get("host");
-  return host ? `${h.get("x-forwarded-proto") ?? "http"}://${host}` : env.appUrl;
-}
 
 export function isAllowedAdmin(email: string) {
   const e = email.trim().toLowerCase();
