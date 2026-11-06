@@ -232,6 +232,11 @@ export default async function ResourcePage({ params, searchParams }: { params: P
                     <div className="mt-0.5 text-slate-500">
                       Sent {q.createdAt.toLocaleDateString()} · due {q.dueDate} · opened {q.openCount}×
                     </div>
+                    {q.submission && (
+                      <Link href={`/admin/requests/${q.id}`} className="font-medium text-brand underline">
+                        View their changes
+                      </Link>
+                    )}
                     <RequestActions request={q} back={`/admin/resources/${r.id}`} />
                   </li>
                 ))}

@@ -3,19 +3,20 @@ import { NextResponse, type NextRequest } from "next/server";
 // Per-instance, in-memory limit for the public link pages: enough to stop token guessing
 // and scripted hammering. Use a shared store (e.g. Upstash) if running many instances.
 const WINDOW_MS = 5 * 60 * 1000;
-const MAX_REQUESTS = 60;
+// Page loads vs. form posts (autosave and submit), counted separately so autosave can't lock someone out.
+const MAX_REQUESTS = { GET: 60, POST: 300 };
 const hits = new Map<string, { count: number; reset: number }>();
 
-function rateLimited(ip: string) {
+function rateLimited(key: string, max: number) {
   const now = Date.now();
   if (hits.size > 10_000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
-  const entry = hits.get(ip);
+  const entry = hits.get(key);
   if (!entry || entry.reset < now) {
-    hits.set(ip, { count: 1, reset: now + WINDOW_MS });
+    hits.set(key, { count: 1, reset: now + WINDOW_MS });
     return false;
   }
   entry.count++;
-  return entry.count > MAX_REQUESTS;
+  return entry.count > max;
 }
 
 function isLinkPage(pathname: string) {
@@ -27,7 +28,8 @@ export function middleware(req: NextRequest) {
 
   if (isLinkPage(pathname)) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "local";
-    if (rateLimited(ip)) {
+    const kind = req.method === "POST" ? "POST" : "GET";
+    if (rateLimited(`${kind}:${ip}`, MAX_REQUESTS[kind])) {
       return new NextResponse("Too many requests. Please wait a few minutes and try again.", {
         status: 429,
         headers: { "Retry-After": "300", "Content-Type": "text/plain; charset=utf-8" },

@@ -2,37 +2,10 @@
 
 import { useActionState, useState, type ReactNode } from "react";
 import { saveResourceAction } from "@/app/admin/resources/actions";
+import { AchievementsEditor, EducationEditor, ProjectsEditor, SkillsEditor, numberOrNull } from "./profile-editors";
 import { TagInput } from "./tag-input";
 import { Button, Card, Field, Input, Select, Textarea, buttonClass } from "./ui";
-import {
-  ACHIEVEMENT_KINDS,
-  AVAILABILITY_STATUSES,
-  EDUCATION_LEVELS,
-  SENIORITY_LEVELS,
-  SKILL_CATEGORIES,
-  type Achievement,
-  type Education,
-  type Project,
-  type ResourceInput,
-  type Skill,
-  type SkillCategory,
-} from "@/lib/resources/types";
-
-const emptyProject: Project = {
-  name: "",
-  type: "",
-  brief: "",
-  features: "",
-  clientName: "",
-  atEnosis: true,
-  industry: "",
-  duration: "",
-  teamSize: "",
-  role: "",
-  technologies: [],
-  contributions: [],
-  outcomes: "",
-};
+import { AVAILABILITY_STATUSES, SENIORITY_LEVELS, type ResourceInput } from "@/lib/resources/types";
 
 export const emptyResource: ResourceInput = {
   name: "",
@@ -63,68 +36,15 @@ function Section({ title, description, children }: { title: string; description?
   );
 }
 
-function numberOrNull(v: string) {
-  if (v.trim() === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-/** Turns the textarea's lines into a list, dropping leading bullet characters. */
-function linesToList(text: string) {
-  return text
-    .split("\n")
-    .map((l) => l.replace(/^\s*[-•*]\s*/, "").trim())
-    .filter(Boolean);
-}
-
 export function ResourceForm({ id, initial }: { id?: string; initial: ResourceInput }) {
   const [state, formAction, pending] = useActionState(saveResourceAction, null);
   const [r, setR] = useState<ResourceInput>(initial);
-  // Contributions are edited as free text and only split into a list on save.
-  const [contribText, setContribText] = useState(() => initial.projects.map((p) => p.contributions.join("\n")));
-
   const set = <K extends keyof ResourceInput>(key: K, value: ResourceInput[K]) => setR((prev) => ({ ...prev, [key]: value }));
-
-  function skillsIn(category: SkillCategory) {
-    return r.skills.filter((s) => s.category === category).map((s) => s.name);
-  }
-  function setSkillsIn(category: SkillCategory, names: string[]) {
-    const existing = new Map(r.skills.filter((s) => s.category === category).map((s) => [s.name.toLowerCase(), s]));
-    const updated: Skill[] = names.map((name) => existing.get(name.toLowerCase()) ?? { category, name, proficiency: null, years: null });
-    set("skills", [...r.skills.filter((s) => s.category !== category), ...updated]);
-  }
-
-  function updateList<T>(key: "education" | "achievements" | "projects", index: number, patch: Partial<T>) {
-    setR((prev) => ({
-      ...prev,
-      [key]: (prev[key] as T[]).map((item, i) => (i === index ? { ...item, ...patch } : item)),
-    }));
-  }
-  function removeFromList(key: "education" | "achievements" | "projects", index: number) {
-    setR((prev) => ({ ...prev, [key]: (prev[key] as unknown[]).filter((_, i) => i !== index) }));
-    if (key === "projects") setContribText((prev) => prev.filter((_, i) => i !== index));
-  }
-  function moveProject(index: number, dir: -1 | 1) {
-    const j = index + dir;
-    if (j < 0 || j >= r.projects.length) return;
-    const swap = <T,>(arr: T[]) => {
-      const next = [...arr];
-      [next[index], next[j]] = [next[j], next[index]];
-      return next;
-    };
-    set("projects", swap(r.projects));
-    setContribText(swap);
-  }
-
-  const payload: ResourceInput = {
-    ...r,
-    projects: r.projects.map((p, i) => ({ ...p, contributions: linesToList(contribText[i] ?? "") })),
-  };
 
   return (
     <form action={formAction} className="space-y-5">
       {id && <input type="hidden" name="id" value={id} />}
-      <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+      <input type="hidden" name="payload" value={JSON.stringify(r)} />
 
       <Section title="Personal details">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -192,161 +112,19 @@ export function ResourceForm({ id, initial }: { id?: string; initial: ResourceIn
       </Section>
 
       <Section title="Tech stack" description="Type an item and press Enter, or paste a comma-separated list.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {SKILL_CATEGORIES.map((c) => (
-            <Field key={c.key} label={c.label}>
-              <TagInput value={skillsIn(c.key)} onChange={(v) => setSkillsIn(c.key, v)} />
-            </Field>
-          ))}
-        </div>
+        <SkillsEditor value={r.skills} onChange={(v) => set("skills", v)} />
       </Section>
 
       <Section title="Education">
-        {r.education.map((ed, i) => (
-          <div key={i} className="grid items-end gap-3 rounded-md border border-slate-200 p-3 sm:grid-cols-[9rem_1fr_1fr_8rem_auto]">
-            <Field label="Level">
-              <Select value={ed.level} onChange={(e) => updateList<Education>("education", i, { level: e.target.value as Education["level"] })}>
-                {EDUCATION_LEVELS.map((l) => (
-                  <option key={l.key} value={l.key}>
-                    {l.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Degree">
-              <Input value={ed.degree} onChange={(e) => updateList<Education>("education", i, { degree: e.target.value })} />
-            </Field>
-            <Field label="Institution">
-              <Input value={ed.institution} onChange={(e) => updateList<Education>("education", i, { institution: e.target.value })} />
-            </Field>
-            <Field label="Year">
-              <Input value={ed.year} onChange={(e) => updateList<Education>("education", i, { year: e.target.value })} />
-            </Field>
-            <Button type="button" variant="ghost" onClick={() => removeFromList("education", i)}>
-              Remove
-            </Button>
-          </div>
-        ))}
-        <Button type="button" variant="secondary" onClick={() => set("education", [...r.education, { level: "bachelor", degree: "", institution: "", year: "" }])}>
-          + Add education
-        </Button>
+        <EducationEditor value={r.education} onChange={(v) => set("education", v)} />
       </Section>
 
       <Section title="Achievements and certifications" description="Use full names, not abbreviations.">
-        {r.achievements.map((a, i) => (
-          <div key={i} className="grid items-end gap-3 rounded-md border border-slate-200 p-3 sm:grid-cols-[10rem_1fr_10rem_6rem_auto]">
-            <Field label="Type">
-              <Select value={a.kind} onChange={(e) => updateList<Achievement>("achievements", i, { kind: e.target.value as Achievement["kind"] })}>
-                {ACHIEVEMENT_KINDS.map((k) => (
-                  <option key={k.key} value={k.key}>
-                    {k.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Name">
-              <Input value={a.name} onChange={(e) => updateList<Achievement>("achievements", i, { name: e.target.value })} />
-            </Field>
-            <Field label="Issuer">
-              <Input value={a.issuer} onChange={(e) => updateList<Achievement>("achievements", i, { issuer: e.target.value })} />
-            </Field>
-            <Field label="Year">
-              <Input value={a.year} onChange={(e) => updateList<Achievement>("achievements", i, { year: e.target.value })} />
-            </Field>
-            <Button type="button" variant="ghost" onClick={() => removeFromList("achievements", i)}>
-              Remove
-            </Button>
-            <Field label="Credential link (optional)" className="sm:col-span-5">
-              <Input value={a.credentialUrl} onChange={(e) => updateList<Achievement>("achievements", i, { credentialUrl: e.target.value })} placeholder="https://" />
-            </Field>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => set("achievements", [...r.achievements, { kind: "certification", name: "", issuer: "", year: "", credentialUrl: "" }])}
-        >
-          + Add achievement or certification
-        </Button>
+        <AchievementsEditor value={r.achievements} onChange={(v) => set("achievements", v)} />
       </Section>
 
       <Section title="Projects" description="Client names are internal only and never appear in generated profiles.">
-        {r.projects.map((p, i) => (
-          <div key={i} className="space-y-3 rounded-md border border-slate-200 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-700">Project {i + 1}</p>
-              <div className="flex gap-1">
-                <Button type="button" variant="ghost" onClick={() => moveProject(i, -1)} disabled={i === 0} aria-label="Move up">
-                  ↑
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => moveProject(i, 1)} disabled={i === r.projects.length - 1} aria-label="Move down">
-                  ↓
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => removeFromList("projects", i)}>
-                  Remove
-                </Button>
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Project name" className="sm:col-span-2">
-                <Input value={p.name} onChange={(e) => updateList<Project>("projects", i, { name: e.target.value })} />
-              </Field>
-              <Field label="Type">
-                <Input value={p.type} onChange={(e) => updateList<Project>("projects", i, { type: e.target.value })} placeholder="Web application" />
-              </Field>
-              <Field label="Client name (internal)">
-                <Input value={p.clientName} onChange={(e) => updateList<Project>("projects", i, { clientName: e.target.value })} />
-              </Field>
-              <Field label="Industry / domain">
-                <Input value={p.industry} onChange={(e) => updateList<Project>("projects", i, { industry: e.target.value })} />
-              </Field>
-              <Field label="Done at Enosis?">
-                <Select value={p.atEnosis ? "yes" : "no"} onChange={(e) => updateList<Project>("projects", i, { atEnosis: e.target.value === "yes" })}>
-                  <option value="yes">Yes</option>
-                  <option value="no">No, previous workplace</option>
-                </Select>
-              </Field>
-              <Field label="Role">
-                <Input value={p.role} onChange={(e) => updateList<Project>("projects", i, { role: e.target.value })} />
-              </Field>
-              <Field label="Duration">
-                <Input value={p.duration} onChange={(e) => updateList<Project>("projects", i, { duration: e.target.value })} placeholder="e.g. Jan 2024 – present" />
-              </Field>
-              <Field label="Team size">
-                <Input value={p.teamSize} onChange={(e) => updateList<Project>("projects", i, { teamSize: e.target.value })} />
-              </Field>
-            </div>
-            <Field label="Brief">
-              <Textarea rows={3} value={p.brief} onChange={(e) => updateList<Project>("projects", i, { brief: e.target.value })} />
-            </Field>
-            <Field label="Key features">
-              <Textarea rows={3} value={p.features} onChange={(e) => updateList<Project>("projects", i, { features: e.target.value })} />
-            </Field>
-            <Field label="Core technologies">
-              <TagInput value={p.technologies} onChange={(v) => updateList<Project>("projects", i, { technologies: v })} />
-            </Field>
-            <Field label="Responsibilities and contributions" hint="One per line. Be concrete: what you built, with which technologies, and the result.">
-              <Textarea
-                rows={5}
-                value={contribText[i] ?? ""}
-                onChange={(e) => setContribText((prev) => prev.map((t, j) => (j === i ? e.target.value : t)))}
-              />
-            </Field>
-            <Field label="Measurable outcomes (optional)" hint='e.g. "Reduced file load time by 80–90%"'>
-              <Textarea rows={2} value={p.outcomes} onChange={(e) => updateList<Project>("projects", i, { outcomes: e.target.value })} />
-            </Field>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            set("projects", [...r.projects, { ...emptyProject }]);
-            setContribText((prev) => [...prev, ""]);
-          }}
-        >
-          + Add project
-        </Button>
+        <ProjectsEditor value={r.projects} onChange={(v) => set("projects", v)} />
       </Section>
 
       {state?.errors && (

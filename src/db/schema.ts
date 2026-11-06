@@ -14,6 +14,7 @@ import type {
   Achievement,
   Education,
   Project,
+  ResourceInput,
   SectionUpdates,
   Skill,
 } from "@/lib/resources/types";
@@ -154,6 +155,11 @@ export const accessRequests = pgTable(
     otpExpiresAt: timestamp("otp_expires_at", { withTimezone: true }),
     otpAttempts: integer("otp_attempts").notNull().default(0),
     verifiedSessionHash: text("verified_session_hash"),
+    // Resource update form (phase 3): the record as first shown, the autosaved draft, and the final submission.
+    baseSnapshot: jsonb("base_snapshot").$type<ResourceInput>(),
+    draft: jsonb("draft").$type<UpdateDraft>(),
+    draftSavedAt: timestamp("draft_saved_at", { withTimezone: true }),
+    submission: jsonb("submission").$type<UpdateSubmission>(),
     createdBy: text("created_by").notNull(),
     ...timestamps,
   },
@@ -211,6 +217,14 @@ export const appSettings = pgTable("app_settings", {
 });
 
 export type RequestContext = { roleTitle?: string; clientIndustry?: string; resourceName?: string };
+export type UpdateDraft = { data: ResourceInput; reviewed: string[]; step: number };
+export type UpdateSubmission = {
+  before: ResourceInput;
+  after: ResourceInput;
+  changedSections: string[];
+  confirmedSections: string[];
+  submittedAt: string;
+};
 export type AccessRequestRow = typeof accessRequests.$inferSelect;
 
 export type ImportResult = { rowNumber: number; name: string; outcome: string; detail?: string; resourceId?: string };

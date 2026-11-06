@@ -31,7 +31,7 @@ export async function takenEmails(db: Db) {
   return new Set(rows.map((r) => r.email));
 }
 
-const SECTION_FIELDS: Record<Section, (keyof ResourceInput)[]> = {
+export const SECTION_FIELDS: Record<Section, (keyof ResourceInput)[]> = {
   personal: ["name", "email", "emailVerified", "title", "seniority"],
   experience: ["yearsPrevious", "yearsEnosis", "availabilityStatus", "availableFrom", "majorExpertise", "domains", "languages"],
   skills: ["skills"],
@@ -41,13 +41,13 @@ const SECTION_FIELDS: Record<Section, (keyof ResourceInput)[]> = {
 };
 
 /** JSON with object keys sorted, so values read back from JSONB (which reorders keys) compare equal. */
-function stableJson(value: unknown): string {
+export function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, v) =>
     v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v,
   );
 }
 
-function changedSections(before: Partial<ResourceInput> | null, after: ResourceInput): Section[] {
+export function changedSections(before: Partial<ResourceInput> | null, after: ResourceInput): Section[] {
   return (Object.keys(SECTION_FIELDS) as Section[]).filter((section) =>
     SECTION_FIELDS[section].some((f) => stableJson(before?.[f] ?? null) !== stableJson(after[f] ?? null)),
   );
@@ -129,6 +129,19 @@ export async function updateResource(db: Db, id: string, input: ResourceInput, a
       .returning();
     return { row, changed: sections };
   });
+}
+
+/**
+ * Records that the person confirmed these sections are still correct, without changing data.
+ * Refreshes their freshness dates so the record is no longer considered stale.
+ */
+export async function confirmSections(db: Db, id: string, sections: Section[], by: Actor["source"]) {
+  const [current] = await db.select().from(resources).where(eq(resources.id, id));
+  if (!current) throw new Error("Resource not found");
+  await db
+    .update(resources)
+    .set({ sectionUpdates: stampSections(current.sectionUpdates, sections, by), lastUpdatedBy: by, updatedAt: new Date() })
+    .where(eq(resources.id, id));
 }
 
 export async function getResource(db: Db, id: string) {

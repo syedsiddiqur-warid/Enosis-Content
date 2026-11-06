@@ -2,11 +2,12 @@
 
 Internal tool for Enosis Solutions to keep resource data current and produce proposal-ready talent profiles.
 
-**Status: Phase 2**
+**Status: Phase 3**
 - Phase 1: admin sign-in, resource data model, admin create/edit/archive, Google Form CSV import, bulk email import.
 - Phase 2: secure links for resources (and reviewers, used from phase 6), editable message templates, email sending (Resend, Postmark, or SendGrid), reminders, optional email code, rate limiting.
+- Phase 3: the resource update form (pre-filled, step by step, autosave) and the admin's highlighted view of what changed.
 
-Later phases add the resource update form, requirements and matching, AI generation, the reviewer page, and Canva export.
+Later phases add requirements and matching, AI generation, the reviewer page, and Canva export.
 
 ## Stack
 
@@ -115,6 +116,26 @@ It skips requests created in the last 24 hours and never sends more than the max
 With a real provider, the app **never sends to sample/unverified addresses**: those messages are recorded as *blocked*, and bulk requests skip those people.
 In `dev` mode everything goes to the dev inbox, where you can also view the HTML version.
 
+## Resource update form
+
+When a resource opens their link they get a short, mobile-friendly form, already filled in with their current information, in six steps:
+
+1. Personal details (name, title, email shown read-only, education)
+2. Experience (years, major expertise, availability, industries, languages)
+3. Tech stack, by category
+4. Certifications and achievements
+5. Projects, with tips on writing a good description
+6. Review and confirm: what was updated or confirmed, and a summary of their changes
+
+- Each step has a **This is still correct** button, so someone with nothing to change can finish in a few taps.
+- Changes **save automatically** a couple of seconds after each edit (and when the tab is hidden). Closing the page and reopening the same link continues where they left off.
+- Resources can't change their email, email status, or seniority.
+- On submit:
+  - Only the sections the person actually changed are written to their record. If an admin edited another section in the meantime, that edit is kept.
+  - The previous version is saved in the history, and sections they confirmed get fresh "last updated" dates, which clears the stale flag.
+  - The request is marked complete, the admin who sent it gets an email, and the person sees the thank-you message (optionally also emailed; see Settings).
+- **Requests → View changes** (also linked from the resource page and the admin email) shows a highlighted before/after of everything that changed, with added and removed lines marked.
+
 ## Data model
 
 - `resources` — one row per person. List sections (tech stack by category, education, achievements, projects) are validated JSONB, read and written as a whole. Each section tracks when and by whom (admin, import, or the resource) it was last changed.
@@ -122,7 +143,7 @@ In `dev` mode everything goes to the dev inbox, where you can also view the HTML
 - `import_batches` — uploaded CSVs, their column mapping, and per-row results.
 - `login_tokens`, `sessions` — admin magic-link sign-in. Only SHA-256 hashes of tokens are stored.
 - `outbound_emails` — every message the app sends (the dev inbox in development).
-- `access_requests` — a task for someone without an account (resource update, later profile review), with due date, expiry, status, and code-check state.
+- `access_requests` — a task for someone without an account (resource update, later profile review), with due date, expiry, status, code-check state, and for update requests the starting snapshot, autosaved draft, and final submission.
 - `access_tokens` — hashed link tokens; a request can have several (initial, resend, reminder).
 - `access_events` — audit log of link activity.
 - `message_templates`, `app_settings` — editable wording and settings.

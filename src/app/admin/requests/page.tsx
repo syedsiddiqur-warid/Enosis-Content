@@ -5,27 +5,10 @@ import { Card, PageHeader } from "@/components/ui";
 import { getDb } from "@/db";
 import { outboundEmails } from "@/db/schema";
 import { formatDueDate, listEvents, listRequests, requestStatus, type RequestStatus } from "@/lib/links/service";
+import { EVENT_LABELS } from "./event-labels";
 
 export const dynamic = "force-dynamic";
 
-const EVENT_LABELS: Record<string, string> = {
-  created: "Request created",
-  email_sent: "Email sent",
-  email_dev_inbox: "Email delivered to dev inbox",
-  email_blocked: "Email blocked",
-  email_failed: "Email failed",
-  opened: "Link opened",
-  opened_revoked: "Opened after it was revoked",
-  opened_expired: "Opened after it expired",
-  opened_completed: "Opened after completion",
-  resent: "Resent with a fresh link",
-  reminded: "Reminder sent",
-  revoked: "Revoked",
-  completed: "Completed",
-  otp_sent: "Verification code sent",
-  otp_verified: "Verification code accepted",
-  otp_failed: "Wrong verification code",
-};
 
 type Search = { status?: string; notice?: string; sent?: string; devInbox?: string; blocked?: string; failed?: string; skipped?: string; problems?: string };
 
@@ -126,7 +109,12 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                     Link expires {r.expiresAt.toLocaleDateString()} · opened {r.openCount}× · {r.remindersSent} reminder{r.remindersSent === 1 ? "" : "s"}
                   </div>
                 </div>
-                <RequestActions request={r} back="/admin/requests" />
+                <div className="flex flex-col items-end gap-1">
+                  <Link href={`/admin/requests/${r.id}`} className="text-xs font-medium text-brand underline">
+                    {r.submission ? "View changes" : "Details"}
+                  </Link>
+                  <RequestActions request={r} back="/admin/requests" />
+                </div>
               </div>
               <details className="mt-2 text-xs">
                 <summary className="cursor-pointer text-slate-500">Activity ({evs.length})</summary>
