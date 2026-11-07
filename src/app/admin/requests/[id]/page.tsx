@@ -69,6 +69,13 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
               </Card>
               <ChangeList diffs={diffs} />
             </>
+          ) : req.purpose === "profile_review" && req.subjectId ? (
+            <Card className="p-6 text-sm text-slate-600">
+              Review round {req.context.round ?? ""} of {req.context.resourceName}&apos;s profile.{" "}
+              <Link href={`/admin/profiles/${req.subjectId}`} className="font-medium text-brand underline">
+                Open the profile and review results
+              </Link>
+            </Card>
           ) : (
             <Card className="p-6 text-sm text-slate-600">
               {req.draftSavedAt

@@ -7,9 +7,13 @@ import { toInput } from "@/lib/resources/service";
 import { getAiSettings } from "@/lib/settings";
 import { factCheck, ruleChecks } from "./fact-check";
 import { generateProfile } from "./generate";
-import { profileContentSchema, type FactFlag } from "./types";
+import { profileContentSchema, type FactCheck, type FactFlag, type ProfileContent } from "./types";
+import type { ResourceInput } from "@/lib/resources/types";
 
 export class ProfileError extends Error {}
+
+/** Approved profiles can't change until an admin reopens them. */
+const LOCKED = ["approved", "exported"];
 
 async function nextVersion(db: Db, profileId: string) {
   const [{ latest }] = await db.select({ latest: max(profileVersions.version) }).from(profileVersions).where(eq(profileVersions.profileId, profileId));
@@ -30,6 +34,7 @@ export async function generateForCandidate(db: Db, requirementId: string, resour
   if ("error" in generated) throw new ProfileError(generated.error);
 
   let [profile] = await db.select().from(profiles).where(and(eq(profiles.requirementId, requirementId), eq(profiles.resourceId, resourceId)));
+  if (profile && LOCKED.includes(profile.status)) throw new ProfileError("This profile is approved and locked. Reopen it first.");
   if (!profile) [profile] = await db.insert(profiles).values({ requirementId, resourceId, createdBy: adminEmail }).returning();
 
   const record = toInput(resource);
@@ -59,6 +64,7 @@ export async function saveEditedProfile(db: Db, profileId: string, raw: unknown,
   if (!parsed.success) throw new ProfileError("The edited profile is incomplete. Please check every section.");
   const current = await getProfile(db, profileId);
   if (!current?.version) throw new ProfileError("Profile not found.");
+  if (LOCKED.includes(current.profile.status)) throw new ProfileError("This profile is approved and locked. Reopen it first.");
   const ai = await getAiSettings(db);
   const snapshot = current.version.resourceSnapshot;
   const version = await nextVersion(db, profileId);
@@ -109,3 +115,19 @@ export async function profilesForRequirement(db: Db, requirementId: string) {
   return new Map(rows.map((p) => [p.resourceId, p]));
 }
 
+
+/** Appends a version and makes it current. Used by reviewer edits and AI revisions. */
+export async function addProfileVersion(
+  db: Db,
+  profileId: string,
+  v: { content: ProfileContent; gaps: string[]; source: string; resourceSnapshot: ResourceInput; createdBy: string; aiCallId?: string; factCheck: FactCheck },
+  status?: string,
+) {
+  const version = await nextVersion(db, profileId);
+  await db.insert(profileVersions).values({ profileId, version, ...v });
+  await db
+    .update(profiles)
+    .set({ currentVersion: version, ...(status ? { status } : {}), updatedAt: new Date() })
+    .where(eq(profiles.id, profileId));
+  return version;
+}

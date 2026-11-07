@@ -1,5 +1,8 @@
-import type { FieldChange, SectionDiff } from "@/lib/resources/diff";
+import type { FieldChange, ItemChange } from "@/lib/resources/diff";
 import { Card } from "./ui";
+
+/** Anything with a title, changed fields, and changed list items: resource diffs and profile version diffs. */
+type DiffSection = { title: string; fields: FieldChange[]; items: ItemChange[]; section?: string; key?: string };
 
 const EMPTY = <div className="text-xs text-slate-400 italic">empty</div>;
 
@@ -57,13 +60,13 @@ const KIND = {
   changed: { label: "Changed", cls: "bg-amber-50 text-amber-800" },
 };
 
-/** Highlighted before/after view of what changed in a resource record. */
-export function ChangeList({ diffs }: { diffs: SectionDiff[] }) {
-  if (diffs.length === 0) return <p className="text-sm text-slate-600">No changes. Everything was confirmed as still correct.</p>;
+/** Highlighted before/after view of what changed in a resource record or between profile versions. */
+export function ChangeList({ diffs, emptyText = "No changes. Everything was confirmed as still correct." }: { diffs: DiffSection[]; emptyText?: string }) {
+  if (diffs.length === 0) return <p className="text-sm text-slate-600">{emptyText}</p>;
   return (
     <div className="space-y-4">
       {diffs.map((d) => (
-        <Card key={d.section} className="p-5">
+        <Card key={d.key ?? d.section ?? d.title} className="p-5">
           <h3 className="mb-3 text-base font-semibold text-slate-900">{d.title}</h3>
           {d.fields.length > 0 && (
             <>

@@ -2,14 +2,15 @@
 
 Internal tool for Enosis Solutions to keep resource data current and produce proposal-ready talent profiles.
 
-**Status: Phase 5**
+**Status: Phase 6**
 - Phase 1: admin sign-in, resource data model, admin create/edit/archive, Google Form CSV import, bulk email import.
 - Phase 2: secure links for resources (and reviewers, used from phase 6), editable message templates, email sending (Resend, Postmark, or SendGrid), reminders, optional email code, rate limiting.
 - Phase 3: the resource update form (pre-filled, step by step, autosave) and the admin's highlighted view of what changed.
 - Phase 4: requirements, ranked matching with reasons, choosing who to propose, and update requests per requirement.
 - Phase 5: AI profile generation with Claude, house style and length settings, and a fact-check pass.
+- Phase 6: the reviewer page (no login): formatted profile, inline edits, suggestions, approve or request changes, Claude revision of suggested sections, and version comparison.
 
-Later phases add the reviewer page and Canva export.
+Phase 7 adds Canva export and the in-app PDF.
 
 ## Stack
 
@@ -194,6 +195,29 @@ The profile page shows the formatted profile (the same layout the reviewer and t
 
 **Without an API key** the app runs in offline mode: **Generate profile** assembles a plain draft straight from the record, clearly labelled "Offline draft (no AI)". Only the rule-based checks run. This lets you try the whole workflow before adding a key.
 
+## Review
+
+From a profile, **Send for review** picks a reviewer (or adds someone new) and a feedback date. The reviewer gets the polite reviewer email with a secure link, valid 3 days by default. If the fact check has high-severity flags, the admin must tick that they've checked them first.
+
+The reviewer's page shows the profile exactly as it will be shared, and they can:
+- **Edit** any section in place: name and title, summary, competencies, technical expertise, education, awards, or a single project. Each edit is saved immediately with who, when, and the before/after text, and can be undone.
+- **Suggest:** select any text and click **Suggest a change**, or use **Suggest** on a section. Quoted text is highlighted in the profile, and marked sections get a colored edge.
+- Use the side panel to see all their edits and suggestions.
+- Finish with **Approve** or **Request changes**, plus an optional overall comment.
+
+What happens next:
+- The reviewer's direct edits always become a new version ("Edited by reviewer"), with rule-based checks re-run.
+- **Approve** locks the profile. It can't be edited, regenerated, or sent for review until an admin clicks **Reopen for changes**.
+- **Request changes**:
+  1. Claude revises **only the sections with suggestions**, under the same no-invention rules. Every other section, including the reviewer's direct edits, is copied back unchanged afterwards, so the model can't alter them.
+  2. The revision runs in the background after the reviewer sees their thank-you page, is fact-checked, and becomes a "Revised" version.
+  3. The admin is emailed, checks the revision (with a **See what changed** comparison), and clicks **Send round 2** to send it back with a new link.
+  4. Without an API key, the suggestions are listed for the admin to apply by hand.
+- The profile page lists every review round: reviewer, status, overall comment, edited sections, suggestions, and the versions they produced.
+- **Versions** has a **changes** link on each version that shows a highlighted before/after of every section that changed.
+
+Profile statuses: Generated → In review → Changes requested → Revised → Approved (→ Exported in phase 7). On the requirement page, "Waiting on resource" shows while an update request is open.
+
 ## Data model
 
 - `resources` — one row per person. List sections (tech stack by category, education, achievements, projects) are validated JSONB, read and written as a whole. Each section tracks when and by whom (admin, import, or the resource) it was last changed.
@@ -210,6 +234,9 @@ The profile page shows the formatted profile (the same layout the reviewer and t
 - `profiles` — one tailored profile per person per requirement, with its status.
 - `profile_versions` — every version's content, gaps, fact-check flags, source (Claude, offline, admin edit), and the record snapshot it was written from.
 - `ai_calls` — log of every Claude API call.
+- `reviewers` — people who review profiles (no account).
+- `reviews` — one review round: profile version sent, reviewer, working copy with their edits, decision, overall comment, and resulting versions.
+- `review_items` — each direct edit (section, before, after, who, when) and suggestion (section, quoted text, comment).
 
 Project client names are stored for internal use only and will never be shown in generated profiles.
 
@@ -221,7 +248,7 @@ Project client names are stored for internal use only and will never be shown in
 | `npm run build` / `npm start` | Production build and server |
 | `npm run db:generate` | Create a migration after editing `src/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
-| `npm run db:seed` | Add the 5 fictional sample resources and 2 sample requirements (each only if its table is empty) |
+| `npm run db:seed` | Add the 5 fictional sample resources, 2 sample requirements, and a sample reviewer (each only if its table is empty) |
 | `npm run typecheck`, `npm run lint` | Checks |
 
 ## Deploying

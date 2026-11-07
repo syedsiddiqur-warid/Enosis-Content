@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { eq, sql } from "drizzle-orm";
 import { createDb } from "@/db/client";
-import { requirements, resources } from "@/db/schema";
+import { requirements, resources, reviewers } from "@/db/schema";
 import { createResource } from "@/lib/resources/service";
 import { resourceInputSchema, type ResourceInput } from "@/lib/resources/types";
 
@@ -244,6 +244,13 @@ async function main() {
     const deadline = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     await db.insert(requirements).values(SEED_REQUIREMENTS.map((r) => ({ ...r, deadline })));
     console.log(`Seeded ${SEED_REQUIREMENTS.length} sample requirements.`);
+  }
+
+  const [{ revCount }] = await db.select({ revCount: sql<number>`count(*)::int` }).from(reviewers);
+  if (revCount === 0) {
+    // Fictional sample reviewer with a sample (unverified) address: messages only reach the dev inbox.
+    await db.insert(reviewers).values({ name: "Karim Hossain", email: "karim.hossain@enosisbd.com", emailVerified: false });
+    console.log("Seeded a sample reviewer.");
   }
 
   const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(resources);

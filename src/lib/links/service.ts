@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, gt, inArray, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { accessEvents, accessRequests, accessTokens, resources, type AccessRequestRow, type ResourceRow } from "@/db/schema";
+import { accessEvents, accessRequests, accessTokens, resources, reviewers, type AccessRequestRow, type ResourceRow } from "@/db/schema";
 import { hashToken, randomToken } from "@/lib/crypto";
 import { sendEmail, type SendResult } from "@/lib/email/mailer";
 import { env } from "@/lib/env";
@@ -70,6 +70,17 @@ function emailIsSendable(r: Pick<ResourceRow, "emailVerified">) {
   return env.emailProvider === "dev" || r.emailVerified;
 }
 
+/** Whether the recipient's address is real (not a generated sample), so real providers may send to it. */
+async function recipientVerified(db: Db, req: AccessRequestRow) {
+  if (req.purpose === "profile_review") {
+    const [r] = await db.select({ emailVerified: reviewers.emailVerified }).from(reviewers).where(eq(reviewers.email, req.recipientEmail));
+    return r ? r.emailVerified : true;
+  }
+  if (!req.resourceId) return true;
+  const [res] = await db.select({ emailVerified: resources.emailVerified }).from(resources).where(eq(resources.id, req.resourceId));
+  return !!res?.emailVerified;
+}
+
 /** Renders a template for a request and sends it. Logs the result as an event. */
 async function sendTemplated(db: Db, req: AccessRequestRow, templateKey: TemplateKey, token: string, actor: string | null) {
   const settings = await getSettings(db);
@@ -90,17 +101,12 @@ async function sendTemplated(db: Db, req: AccessRequestRow, templateKey: Templat
   const subject = fill(template.subject, vars).text;
   const text = fill(template.body, vars).text;
 
-  let verified = true;
-  if (req.resourceId && req.purpose === "resource_update") {
-    const [res] = await db.select({ emailVerified: resources.emailVerified }).from(resources).where(eq(resources.id, req.resourceId));
-    verified = !!res?.emailVerified;
-  }
   const result = await sendEmail({
     to: req.recipientEmail,
     subject,
     text,
     html: toHtml(text, link),
-    recipientVerified: verified,
+    recipientVerified: await recipientVerified(db, req),
     templateKey,
     requestId: req.id,
   });
@@ -146,6 +152,47 @@ export async function createResourceUpdateRequest(db: Db, resource: ResourceRow,
   await logEvent(db, req.id, "created", { actor: adminEmail, detail: `Due ${input.dueDate}; expires ${expiresAt.toISOString().slice(0, 10)}` });
   const token = await issueToken(db, req.id, "initial");
   const email = await sendTemplated(db, req, "resource_update_request", token, adminEmail);
+  return { request: req, email };
+}
+
+export type NewReviewRequest = {
+  reviewer: { name: string; email: string; emailVerified: boolean };
+  dueDate: string;
+  resourceId: string;
+  requirementId: string;
+  profileId: string;
+  reviewId: string;
+  round: number;
+  roleTitle: string;
+  resourceName: string;
+};
+
+/** Sends a reviewer their secure link to one review round of a profile. */
+export async function createReviewRequest(db: Db, input: NewReviewRequest, adminEmail: string) {
+  if (!(env.emailProvider === "dev" || input.reviewer.emailVerified)) {
+    throw new LinkError(`${input.reviewer.name} only has a sample email address. Add their real email before sending.`);
+  }
+  const settings = await getSettings(db);
+  const dueEnd = new Date(`${input.dueDate}T23:59:59Z`);
+  const expiresAt = new Date(Math.max(Date.now() + settings.reviewerLinkDays * DAY_MS, dueEnd.getTime()));
+  const [req] = await db
+    .insert(accessRequests)
+    .values({
+      purpose: "profile_review",
+      resourceId: input.resourceId,
+      requirementId: input.requirementId,
+      subjectId: input.profileId,
+      recipientEmail: input.reviewer.email,
+      recipientName: input.reviewer.name,
+      context: { roleTitle: input.roleTitle, resourceName: input.resourceName, reviewId: input.reviewId, round: input.round },
+      dueDate: input.dueDate,
+      expiresAt,
+      createdBy: adminEmail,
+    })
+    .returning();
+  await logEvent(db, req.id, "created", { actor: adminEmail, detail: `Review round ${input.round}; due ${input.dueDate}` });
+  const token = await issueToken(db, req.id, "initial");
+  const email = await sendTemplated(db, req, "reviewer_request", token, adminEmail);
   return { request: req, email };
 }
 
@@ -232,12 +279,7 @@ export async function sendOtp(db: Db, req: AccessRequestRow, meta: VisitMeta) {
     .where(eq(accessRequests.id, req.id));
   const settings = await getSettings(db);
   const text = `Hi ${firstName(req.recipientName)},\n\nYour verification code is ${code}. It expires in 10 minutes.\n\nIf you didn't try to open a link from us, you can ignore this email.\n\nBest regards,\n${settings.senderName}`;
-  let verified = true;
-  if (req.resourceId) {
-    const [res] = await db.select({ emailVerified: resources.emailVerified }).from(resources).where(eq(resources.id, req.resourceId));
-    verified = !!res?.emailVerified;
-  }
-  await sendEmail({ to: req.recipientEmail, subject: `Your verification code: ${code}`, text, html: toHtml(text), recipientVerified: verified, templateKey: "otp", requestId: req.id });
+  await sendEmail({ to: req.recipientEmail, subject: `Your verification code: ${code}`, text, html: toHtml(text), recipientVerified: await recipientVerified(db, req), templateKey: "otp", requestId: req.id });
   await logEvent(db, req.id, "otp_sent", meta);
   return maskEmail(req.recipientEmail);
 }

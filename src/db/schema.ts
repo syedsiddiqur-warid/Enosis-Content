@@ -227,6 +227,67 @@ export const aiCalls = pgTable("ai_calls", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** People who review profiles. No account; they get secure links. */
+export const reviewers = pgTable("reviewers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  // false for generated sample addresses: never sent real email.
+  emailVerified: boolean("email_verified").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One review round of one profile version by one reviewer. */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    reviewerId: uuid("reviewer_id")
+      .notNull()
+      .references(() => reviewers.id),
+    requestId: uuid("request_id"),
+    round: integer("round").notNull(),
+    baseVersion: integer("base_version").notNull(),
+    // The profile with the reviewer's direct edits applied, saved as they go.
+    workingContent: jsonb("working_content").$type<ProfileContent>().notNull(),
+    status: text("status").notNull().default("open"), // open | approved | changes_requested
+    overallComment: text("overall_comment").notNull().default(""),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    reviewerEditVersion: integer("reviewer_edit_version"),
+    revisionVersion: integer("revision_version"),
+    revisionError: text("revision_error"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("reviews_profile_idx").on(t.profileId)],
+);
+
+/** A reviewer's direct edit (with before/after) or suggestion on one section. */
+export const reviewItems = pgTable(
+  "review_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // edit | suggestion
+    section: text("section").notNull(),
+    sectionLabel: text("section_label").notNull(),
+    quote: text("quote").notNull().default(""),
+    comment: text("comment").notNull().default(""),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    author: text("author").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("review_items_review_idx").on(t.reviewId)],
+);
+
+export type ReviewRow = typeof reviews.$inferSelect;
+export type ReviewItemRow = typeof reviewItems.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;
 export type ProfileVersionRow = typeof profileVersions.$inferSelect;
 
@@ -321,7 +382,7 @@ export const appSettings = pgTable("app_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type RequestContext = { roleTitle?: string; clientIndustry?: string; resourceName?: string };
+export type RequestContext = { roleTitle?: string; clientIndustry?: string; resourceName?: string; reviewId?: string; round?: number };
 export type UpdateDraft = { data: ResourceInput; reviewed: string[]; step: number };
 export type UpdateSubmission = {
   before: ResourceInput;
