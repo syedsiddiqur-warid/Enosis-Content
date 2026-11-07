@@ -50,6 +50,13 @@
       "when": 1794056092681,
       "tag": "0006_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794056936111,
+      "tag": "0007_exports",
+      "breakpoints": true
     }
   ]
 }

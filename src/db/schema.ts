@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   date,
   index,
   integer,
@@ -286,6 +287,48 @@ export const reviewItems = pgTable(
   (t) => [index("review_items_review_idx").on(t.reviewId)],
 );
 
+const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
+  dataType: () => "bytea",
+  fromDriver: (v) => Buffer.from(v),
+});
+
+/** Every export of a profile version: in-app PDF or Canva design (+ its exported PDF). */
+export const profileExports = pgTable(
+  "profile_exports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    method: text("method").notNull(), // html | canva
+    status: text("status").notNull(), // done | failed
+    fileName: text("file_name").notNull(),
+    pdf: bytea("pdf"),
+    sizeBytes: integer("size_bytes"),
+    canvaDesignId: text("canva_design_id"),
+    canvaEditUrl: text("canva_edit_url"),
+    canvaViewUrl: text("canva_view_url"),
+    error: text("error"),
+    durationMs: integer("duration_ms"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("profile_exports_profile_idx").on(t.profileId)],
+);
+
+/** The Canva account the app acts as. Tokens are encrypted with SECRET_KEY. */
+export const canvaConnections = pgTable("canva_connections", {
+  id: text("id").primaryKey(), // "default"
+  accessTokenEnc: text("access_token_enc").notNull(),
+  refreshTokenEnc: text("refresh_token_enc").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  scope: text("scope").notNull().default(""),
+  connectedBy: text("connected_by").notNull(),
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ProfileExportRow = typeof profileExports.$inferSelect;
 export type ReviewRow = typeof reviews.$inferSelect;
 export type ReviewItemRow = typeof reviewItems.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;

@@ -27,6 +27,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <h2 className="mt-8 mb-3 text-base font-semibold">AI profile writing</h2>
       <AiSettingsForm settings={aiSettings} mode={env.aiMode} model={env.anthropicModel} />
 
+      <h2 className="mt-8 mb-3 text-base font-semibold">Export</h2>
+      <Card className="mb-2">
+        <Link href="/admin/settings/canva" className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+          <div className="flex-1">
+            <div className="text-sm font-medium text-slate-900">Canva and PDF export</div>
+            <div className="text-xs text-slate-500">Connect Canva, choose the brand template, and map profile fields to it. The in-app PDF needs no setup.</div>
+          </div>
+          <span className="text-sm text-brand">Open →</span>
+        </Link>
+      </Card>
+
       <h2 className="mt-8 mb-3 text-base font-semibold">Messages</h2>
       <Card className="divide-y divide-slate-100">
         {templates.map((t) => (

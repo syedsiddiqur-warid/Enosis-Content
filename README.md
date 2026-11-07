@@ -2,7 +2,7 @@
 
 Internal tool for Enosis Solutions to keep resource data current and produce proposal-ready talent profiles.
 
-**Status: Phase 6**
+**Status: Phase 7**
 - Phase 1: admin sign-in, resource data model, admin create/edit/archive, Google Form CSV import, bulk email import.
 - Phase 2: secure links for resources (and reviewers, used from phase 6), editable message templates, email sending (Resend, Postmark, or SendGrid), reminders, optional email code, rate limiting.
 - Phase 3: the resource update form (pre-filled, step by step, autosave) and the admin's highlighted view of what changed.
@@ -10,7 +10,9 @@ Internal tool for Enosis Solutions to keep resource data current and produce pro
 - Phase 5: AI profile generation with Claude, house style and length settings, and a fact-check pass.
 - Phase 6: the reviewer page (no login): formatted profile, inline edits, suggestions, approve or request changes, Claude revision of suggested sections, and version comparison.
 
-Phase 7 adds Canva export and the in-app PDF.
+- Phase 7: export approved profiles to Canva (brand template autofill → PDF), with an in-app PDF from the same template as the fallback.
+
+Phase 8 adds the dashboard, polish, and deployment.
 
 ## Stack
 
@@ -60,6 +62,10 @@ Open http://localhost:3100, enter an admin email, then open the **dev inbox** at
 | `AUDIT_SALT` | Salt for hashing visitor IPs in the link audit log |
 | `ANTHROPIC_API_KEY` | Claude API key for profile generation and fact-checking |
 | `ANTHROPIC_MODEL` | Model id (default `claude-opus-5-5`) |
+| `SECRET_KEY` | Encrypts stored Canva tokens and signs internal print URLs. **Set a long random value in production** |
+| `CANVA_CLIENT_ID` / `CANVA_CLIENT_SECRET` | Canva Connect API integration credentials |
+| `CANVA_REDIRECT_URI` | Must match the integration's redirect URL (default `http://127.0.0.1:3100/api/canva/callback`) |
+| `CHROME_PATH` | Chrome or Edge for the in-app PDF. Auto-detected on Windows, macOS, and Linux |
 | `AI_MODE` | `claude` or `offline`. Defaults to `claude` when a key is set; `offline` builds plain drafts from the record without AI |
 | `EMAIL_FROM` | Sender name and address |
 | `SAMPLE_EMAIL_DOMAIN` | Domain for generated sample addresses |
@@ -218,6 +224,34 @@ What happens next:
 
 Profile statuses: Generated → In review → Changes requested → Revised → Approved (→ Exported in phase 7). On the requirement page, "Waiting on resource" shows while an update request is open.
 
+## Export (Canva and in-app PDF)
+
+When a profile is **approved**, its page shows an **Export** card. Export is the last status step (Approved → Exported).
+
+### In-app PDF (always available)
+
+**Make PDF (in-app)** prints the same HTML template the reviewer saw, using headless Chrome or Edge via `puppeteer-core`:
+- A4 pages, with `www.enosisbd.com` and the page number in the footer of every page.
+- The print page has no admin session, so it's reachable only through a signed URL that expires after 2 minutes.
+- The PDF is stored in the database, so it works on Supabase with no extra storage setup. Download or open it from the profile page; downloads are admin-only.
+- On a server without Chrome (e.g. Vercel), set `CHROME_PATH` to a Chromium build such as `@sparticuz/chromium`, or run the app where Chrome is installed.
+
+### Canva
+
+**Export to Canva** fills your Canva brand template with the profile, then exports the new design as a PDF. The app keeps the PDF and a link to edit the design in Canva.
+- Behind one interface: if Canva fails for any reason, the in-app PDF is made instead and the Canva error is recorded.
+- Setup (**Settings → Canva and PDF export** shows the same list):
+  1. Create a **Canva Connect API integration** in the Canva Developer Portal. Put its Client ID and secret in `CANVA_CLIENT_ID` / `CANVA_CLIENT_SECRET`.
+  2. Add the redirect URL `http://127.0.0.1:3100/api/canva/callback` (or your production URL). Canva expects `127.0.0.1` rather than `localhost` locally.
+  3. Enable the scopes `brandtemplate:meta:read`, `brandtemplate:content:read`, `design:content:write`, `design:content:read`, and `design:meta:read`.
+  4. The Canva user who connects must be on **Canva Pro, Teams, or Enterprise**. Brand templates and autofill aren't available on free accounts.
+  5. In Canva, name the text fields of the profile design with **Data autofill / Bulk create** (e.g. `name`, `career_summary`, `project1_title`), and publish it as a **brand template**.
+  6. In the app, click **Connect Canva**, pick the brand template, and map each template field to a profile field. Recognizable names are pre-mapped.
+- Only text fields are filled; image and chart fields stay as designed.
+- Canva tokens are stored encrypted with `SECRET_KEY` and refreshed automatically (Canva refresh tokens are single-use).
+- The OAuth verifier is kept server-side under a hash of the one-time state, so the flow works even when the callback arrives on `127.0.0.1`.
+- Canva's download links expire after 24 hours, so the PDF is downloaded straight away. The design edit link stays valid for 30 days.
+
 ## Data model
 
 - `resources` — one row per person. List sections (tech stack by category, education, achievements, projects) are validated JSONB, read and written as a whole. Each section tracks when and by whom (admin, import, or the resource) it was last changed.
@@ -237,6 +271,8 @@ Profile statuses: Generated → In review → Changes requested → Revised → 
 - `reviewers` — people who review profiles (no account).
 - `reviews` — one review round: profile version sent, reviewer, working copy with their edits, decision, overall comment, and resulting versions.
 - `review_items` — each direct edit (section, before, after, who, when) and suggestion (section, quoted text, comment).
+- `profile_exports` — every export: method (in-app or Canva), version, the PDF itself, Canva design links, errors, and timing.
+- `canva_connections` — the connected Canva account's tokens, encrypted.
 
 Project client names are stored for internal use only and will never be shown in generated profiles.
 

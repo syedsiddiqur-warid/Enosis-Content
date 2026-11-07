@@ -15,7 +15,8 @@ import { getProfile } from "@/lib/profiles/service";
 import { PROFILE_STATUSES } from "@/lib/profiles/types";
 import { listReviewers, reviewsForProfile } from "@/lib/reviews/service";
 import { getSettings } from "@/lib/settings";
-import { recheckProfileAction, regenerateProfileAction, reopenProfileAction, restoreVersionAction, retryRevisionAction } from "../actions";
+import { exportProfileAction, recheckProfileAction, regenerateProfileAction, reopenProfileAction, restoreVersionAction, retryRevisionAction } from "../actions";
+import { exportAvailability, listExports } from "@/lib/export";
 import { ProfileEditor } from "./profile-editor";
 import { SendReviewForm } from "./send-review-form";
 
@@ -47,6 +48,8 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const rounds = await reviewsForProfile(db, id);
   const reviewerList = await listReviewers(db);
   const settings = await getSettings(db);
+  const exports = await listExports(db, id);
+  const availability = await exportAvailability(db);
 
   const isCurrent = version.version === profile.currentVersion;
   const locked = profile.status === "approved" || profile.status === "exported";
@@ -137,6 +140,65 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
           </div>
 
           <aside className="space-y-5">
+            {locked && (
+              <Card className="border-emerald-200 p-4 text-sm">
+                <h3 className="mb-1 font-semibold">Export</h3>
+                <p className="mb-3 text-xs text-slate-500">Exports the approved version (v{profile.currentVersion}).</p>
+                <div className="space-y-2">
+                  <form action={exportProfileAction.bind(null, id, "canva")}>
+                    <PendingButton className="w-full" disabled={!!availability.canva} pendingLabel="Exporting to Canva…">
+                      Export to Canva
+                    </PendingButton>
+                  </form>
+                  {availability.canva && (
+                    <p className="text-xs text-slate-500">
+                      {availability.canva}{" "}
+                      <Link href="/admin/settings/canva" className="text-brand underline">
+                        Canva settings
+                      </Link>
+                    </p>
+                  )}
+                  <form action={exportProfileAction.bind(null, id, "html")}>
+                    <PendingButton variant="secondary" className="w-full" disabled={!!availability.html} pendingLabel="Making the PDF…">
+                      Make PDF (in-app)
+                    </PendingButton>
+                  </form>
+                  {availability.html && <p className="text-xs text-red-700">{availability.html}</p>}
+                </div>
+                {exports.length > 0 && (
+                  <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs">
+                    {exports.map((e) => (
+                      <li key={e.id}>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge tone={e.status === "done" ? "green" : "red"}>{e.method === "canva" ? "Canva" : "In-app PDF"}</Badge>
+                          <span className="text-slate-500">
+                            v{e.version} · {e.createdAt.toLocaleString()}
+                            {e.sizeBytes ? ` · ${Math.round(e.sizeBytes / 1024)} KB` : ""}
+                          </span>
+                        </div>
+                        {e.status === "done" ? (
+                          <div className="mt-0.5 flex flex-wrap gap-3">
+                            <a href={`/api/exports/${e.id}`} className="font-medium text-brand underline">
+                              Download PDF
+                            </a>
+                            <a href={`/api/exports/${e.id}?inline=1`} target="_blank" rel="noreferrer" className="text-brand underline">
+                              Open
+                            </a>
+                            {e.canvaEditUrl && (
+                              <a href={e.canvaEditUrl} target="_blank" rel="noreferrer" className="text-brand underline">
+                                Edit in Canva
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-0.5 text-red-700">{e.error}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            )}
             {!locked && isCurrent && (
               <Card className="p-4">
                 <h3 className="mb-1 text-sm font-semibold">{rounds.length ? "Send back for review" : "Send for review"}</h3>

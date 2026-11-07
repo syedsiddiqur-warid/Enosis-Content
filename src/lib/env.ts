@@ -21,6 +21,14 @@ export const env = {
   aiMode: (process.env.AI_MODE || (process.env.ANTHROPIC_API_KEY ? "claude" : "offline")) as "claude" | "offline",
   // Used to hash visitor IPs in the link audit log, so raw IPs are never stored.
   auditSalt: process.env.AUDIT_SALT || "talent-profile-studio",
+  // Encrypts stored Canva tokens and signs internal print URLs. Set a long random value in production.
+  secretKey: process.env.SECRET_KEY || "dev-only-secret-change-me",
+  canvaClientId: process.env.CANVA_CLIENT_ID || "",
+  canvaClientSecret: process.env.CANVA_CLIENT_SECRET || "",
+  // Must exactly match a redirect URL registered for the Canva integration.
+  canvaRedirectUri: process.env.CANVA_REDIRECT_URI || "http://127.0.0.1:3100/api/canva/callback",
+  // Optional: path to Chrome or Edge for the in-app PDF. Auto-detected when empty.
+  chromePath: process.env.CHROME_PATH || "",
   isProduction: process.env.NODE_ENV === "production",
 };
 

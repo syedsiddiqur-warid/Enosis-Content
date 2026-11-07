@@ -7,6 +7,9 @@ import { getDb } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { ProfileError, generateForCandidate, getProfile, recheckProfile, saveEditedProfile } from "@/lib/profiles/service";
 import { ReviewError, reopenProfile, runRevision, sendForReview } from "@/lib/reviews/service";
+import { eq } from "drizzle-orm";
+import { requirements } from "@/db/schema";
+import { exportProfile } from "@/lib/export";
 
 const uuid = z.uuid();
 
@@ -130,4 +133,25 @@ export async function retryRevisionAction(profileId: string, reviewId: string) {
   const db = await getDb();
   await runRevision(db, uuid.parse(reviewId));
   redirect(`/admin/profiles/${profileId}?notice=${encodeURIComponent("Revision attempted. See the review round for the result.")}`);
+}
+
+/** Exports the approved version: Canva (falls back to the in-app PDF if Canva fails) or the in-app PDF. */
+export async function exportProfileAction(profileId: string, method: "html" | "canva") {
+  const session = await requireAdmin();
+  const db = await getDb();
+  const data = await getProfile(db, uuid.parse(profileId));
+  if (!data) redirect("/admin/requirements");
+  if (data.profile.status !== "approved" && data.profile.status !== "exported") {
+    redirect(`/admin/profiles/${profileId}?notice=${encodeURIComponent("Only approved profiles can be exported.")}`);
+  }
+  const [requirement] = await db.select().from(requirements).where(eq(requirements.id, data.profile.requirementId));
+  let notice: string;
+  try {
+    const result = await exportProfile(db, profileId, method === "canva" ? "canva" : "html", session.email, requirement?.roleTitle ?? "");
+    notice = result.fellBack ? `Canva export failed (${result.canvaError}). The in-app PDF was made instead.` : method === "canva" ? "Exported to Canva. The PDF is ready to download." : "PDF ready to download.";
+  } catch (err) {
+    notice = `Export failed: ${err instanceof Error ? err.message : String(err)}`;
+  }
+  revalidatePath(`/admin/profiles/${profileId}`);
+  redirect(`/admin/profiles/${profileId}?notice=${encodeURIComponent(notice)}`);
 }

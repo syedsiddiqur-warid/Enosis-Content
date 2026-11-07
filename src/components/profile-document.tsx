@@ -12,6 +12,8 @@ type Props = {
   content: ProfileContent;
   wrap?: (key: string, node: ReactNode) => ReactNode;
   hl?: (text: string) => ReactNode;
+  /** "print": no card styling or inline footer (the PDF adds the footer to every page). */
+  variant?: "screen" | "print";
 };
 
 function SectionTitle({ children }: { children: ReactNode }) {
@@ -33,9 +35,16 @@ function Bullets({ items, hl }: { items: string[]; hl: (t: string) => ReactNode 
 const plain = (t: string) => t;
 const noWrap = (_key: string, node: ReactNode) => node;
 
-export function ProfileDocument({ content: c, wrap = noWrap, hl = plain }: Props) {
+export function ProfileDocument({ content: c, wrap = noWrap, hl = plain, variant = "screen" }: Props) {
+  const print = variant === "print";
   return (
-    <article className="mx-auto max-w-[820px] bg-white px-6 py-8 text-[14px] leading-relaxed text-slate-800 shadow-sm ring-1 ring-slate-200 sm:px-14 sm:py-10">
+    <article
+      className={
+        print
+          ? "bg-white text-[13px] leading-relaxed text-slate-800"
+          : "mx-auto max-w-[820px] bg-white px-6 py-8 text-[14px] leading-relaxed text-slate-800 shadow-sm ring-1 ring-slate-200 sm:px-14 sm:py-10"
+      }
+    >
       {wrap(
         "header",
         <header>
@@ -141,7 +150,7 @@ export function ProfileDocument({ content: c, wrap = noWrap, hl = plain }: Props
           </div>
         </>
       )}
-      <div className="mt-10 border-t border-slate-200 pt-3 text-center text-[11px] tracking-wide text-slate-500">www.enosisbd.com</div>
+      {!print && <div className="mt-10 border-t border-slate-200 pt-3 text-center text-[11px] tracking-wide text-slate-500">www.enosisbd.com</div>}
     </article>
   );
 }
