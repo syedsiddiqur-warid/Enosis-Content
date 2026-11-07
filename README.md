@@ -2,13 +2,14 @@
 
 Internal tool for Enosis Solutions to keep resource data current and produce proposal-ready talent profiles.
 
-**Status: Phase 4**
+**Status: Phase 5**
 - Phase 1: admin sign-in, resource data model, admin create/edit/archive, Google Form CSV import, bulk email import.
 - Phase 2: secure links for resources (and reviewers, used from phase 6), editable message templates, email sending (Resend, Postmark, or SendGrid), reminders, optional email code, rate limiting.
 - Phase 3: the resource update form (pre-filled, step by step, autosave) and the admin's highlighted view of what changed.
 - Phase 4: requirements, ranked matching with reasons, choosing who to propose, and update requests per requirement.
+- Phase 5: AI profile generation with Claude, house style and length settings, and a fact-check pass.
 
-Later phases add AI profile generation, the reviewer page, and Canva export.
+Later phases add the reviewer page and Canva export.
 
 ## Stack
 
@@ -56,6 +57,9 @@ Open http://localhost:3100, enter an admin email, then open the **dev inbox** at
 | `RESEND_API_KEY` / `POSTMARK_SERVER_TOKEN` / `SENDGRID_API_KEY` | Key for the chosen provider |
 | `CRON_SECRET` | Protects the reminder job at `/api/cron/reminders` |
 | `AUDIT_SALT` | Salt for hashing visitor IPs in the link audit log |
+| `ANTHROPIC_API_KEY` | Claude API key for profile generation and fact-checking |
+| `ANTHROPIC_MODEL` | Model id (default `claude-opus-5-5`) |
+| `AI_MODE` | `claude` or `offline`. Defaults to `claude` when a key is set; `offline` builds plain drafts from the record without AI |
 | `EMAIL_FROM` | Sender name and address |
 | `SAMPLE_EMAIL_DOMAIN` | Domain for generated sample addresses |
 | `STALE_AFTER_DAYS` | Records older than this are flagged stale (default 60) |
@@ -164,6 +168,32 @@ Each row shows why: matched must-haves (with how many projects used them), missi
 - Each proposed person shows their latest update request for this requirement and a link to their changes.
 - A resource's page lists the requirements they're proposed for.
 
+## AI profile generation
+
+On a requirement, each proposed person has **Generate profile**. It writes a tailored profile in our current format: header, career summary, core competency, technical expertise, education, awards & certifications, and 2–4 project engagements.
+
+How it works:
+- Claude receives the requirement and the person's record. Email addresses and **client names are removed before sending**, so they can't leak into the profile.
+- The system prompt enforces the hard rules:
+  - use only facts from the record (tailoring means selecting and emphasizing, never inventing);
+  - missing must-have skills go into an internal **gaps** list, never into the profile;
+  - prefer concrete technical work over management language;
+  - keep numbers exactly as written;
+  - project titles describe the product, never the client.
+- The response is constrained to a JSON schema (structured outputs) and validated with Zod. Output that breaks a limit or rule (too many bullets, a client name, a project that doesn't exist in the record) is retried up to 3 times with the problems listed; anything left over is flagged.
+- If Claude's safety classifiers decline a request, the API automatically retries on Anthropic's recommended fallback model (`fallbacks: "default"`).
+- **Every call is logged** in `ai_calls`: purpose, requirement, resource and the record's last-updated time, model, attempt, full request and response, status, token usage, and duration.
+
+**Fact check** runs right after generation and is shown next to the profile, before it goes to a reviewer:
+- Rule-based checks: every skill and technology must exist in the record; every project must trace to a record project; awards and education must match; every number must appear in the record; no client names; section limits.
+- A second Claude pass compares every claim with the record and flags unsupported or exaggerated ones by severity.
+
+The profile page shows the formatted profile (the same layout the reviewer and the PDF export will use), the fact-check flags, the internal gaps, and the version history. You can **Edit** (saved as a new version; checks re-run), **Re-run fact check**, **Regenerate**, or **Restore** an older version. If the person's record changes after a version was written, the page says so.
+
+**Settings → AI profile writing** holds the house style guide (seeded from our current profiles) and the section limits: summary length, number and length of competencies, number of projects, description length, and contributions per project.
+
+**Without an API key** the app runs in offline mode: **Generate profile** assembles a plain draft straight from the record, clearly labelled "Offline draft (no AI)". Only the rule-based checks run. This lets you try the whole workflow before adding a key.
+
 ## Data model
 
 - `resources` — one row per person. List sections (tech stack by category, education, achievements, projects) are validated JSONB, read and written as a whole. Each section tracks when and by whom (admin, import, or the resource) it was last changed.
@@ -176,7 +206,10 @@ Each row shows why: matched must-haves (with how many projects used them), missi
 - `access_events` — audit log of link activity.
 - `message_templates`, `app_settings` — editable wording and settings.
 - `requirements` — prospects' staffing requests.
-- `requirement_candidates` — who was proposed for each requirement, with their score when added (phase 5 attaches their tailored profile).
+- `requirement_candidates` — who was proposed for each requirement, with their score when added.
+- `profiles` — one tailored profile per person per requirement, with its status.
+- `profile_versions` — every version's content, gaps, fact-check flags, source (Claude, offline, admin edit), and the record snapshot it was written from.
+- `ai_calls` — log of every Claude API call.
 
 Project client names are stored for internal use only and will never be shown in generated profiles.
 

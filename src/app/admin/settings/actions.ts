@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { resetTemplate, saveTemplate, TEMPLATE_DEFS, type TemplateKey } from "@/lib/notify/templates";
-import { saveSettings, settingsSchema } from "@/lib/settings";
+import { DEFAULT_STYLE_GUIDE, aiSettingsSchema, saveAiSettings, saveSettings, settingsSchema } from "@/lib/settings";
 
 export type FormState = { error?: string } | null;
 
@@ -48,4 +48,27 @@ export async function resetTemplateAction(formData: FormData) {
   await resetTemplate(await getDb(), key);
   revalidatePath("/admin/settings");
   redirect(`/admin/settings/templates/${key}`);
+}
+
+export async function saveAiSettingsAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const session = await requireAdmin();
+  const num = (k: string) => Number(formData.get(k));
+  const reset = formData.get("resetStyle") === "1";
+  const parsed = aiSettingsSchema.safeParse({
+    styleGuide: reset ? DEFAULT_STYLE_GUIDE : String(formData.get("styleGuide") ?? "").replace(/\r\n/g, "\n").trim(),
+    summaryMaxWords: num("summaryMaxWords"),
+    competenciesMin: num("competenciesMin"),
+    competenciesMax: num("competenciesMax"),
+    competencyMaxWords: num("competencyMaxWords"),
+    projectsMin: num("projectsMin"),
+    projectsMax: num("projectsMax"),
+    projectDescriptionMaxWords: num("projectDescriptionMaxWords"),
+    contributionsMax: num("contributionsMax"),
+    contributionMaxWords: num("contributionMaxWords"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
+  if (parsed.data.competenciesMin > parsed.data.competenciesMax || parsed.data.projectsMin > parsed.data.projectsMax) return { error: "A minimum can't be larger than its maximum." };
+  await saveAiSettings(await getDb(), parsed.data, session.email);
+  revalidatePath("/admin/settings");
+  redirect("/admin/settings?saved=1#ai");
 }

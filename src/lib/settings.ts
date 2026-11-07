@@ -25,8 +25,50 @@ export async function getSettings(db: Db): Promise<Settings> {
 }
 
 export async function saveSettings(db: Db, value: Settings, by: string) {
+  await saveRow(db, KEY, value, by);
+}
+
+async function saveRow(db: Db, key: string, value: unknown, by: string) {
   await db
     .insert(appSettings)
-    .values({ key: KEY, value, updatedBy: by })
+    .values({ key, value, updatedBy: by })
     .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedBy: by, updatedAt: new Date() } });
+}
+
+// ---- AI writing settings (house style and section limits) ----
+
+export const DEFAULT_STYLE_GUIDE = `- Write in the third person. Start bullets with a verb or noun, never a pronoun ("Designed the booking API", not "He designed…").
+- Be specific and technical: name the technologies, what was built, and the result.
+- Prefer concrete technical contributions over generic leadership or management language.
+- Use past tense for finished work and present tense for ongoing work.
+- Keep numbers and results exactly as the resource wrote them; never round up or add new ones.
+- Project titles describe the product in title case (e.g. "Web-Based Event Management Platform"), never the client.
+- Career summary: title and years of experience first, then core specialization, then one notable strength.
+- Core competencies: each bullet states a strength and backs it with evidence from the record.
+- Plain, confident, professional tone. No buzzwords ("rockstar", "ninja", "synergy").`;
+
+export const aiSettingsSchema = z.object({
+  styleGuide: z.string().max(10000).default(DEFAULT_STYLE_GUIDE),
+  summaryMaxWords: z.number().int().min(20).max(300).default(70),
+  competenciesMin: z.number().int().min(1).max(10).default(3),
+  competenciesMax: z.number().int().min(1).max(10).default(5),
+  competencyMaxWords: z.number().int().min(10).max(100).default(40),
+  projectsMin: z.number().int().min(1).max(10).default(2),
+  projectsMax: z.number().int().min(1).max(10).default(4),
+  projectDescriptionMaxWords: z.number().int().min(20).max(300).default(90),
+  contributionsMax: z.number().int().min(1).max(15).default(6),
+  contributionMaxWords: z.number().int().min(5).max(80).default(30),
+});
+export type AiSettings = z.infer<typeof aiSettingsSchema>;
+
+const AI_KEY = "ai";
+
+export async function getAiSettings(db: Db): Promise<AiSettings> {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, AI_KEY));
+  const parsed = aiSettingsSchema.safeParse(row?.value ?? {});
+  return parsed.success ? parsed.data : aiSettingsSchema.parse({});
+}
+
+export async function saveAiSettings(db: Db, value: AiSettings, by: string) {
+  await saveRow(db, AI_KEY, value, by);
 }

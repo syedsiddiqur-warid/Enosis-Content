@@ -3,7 +3,8 @@ import { Badge, Card, PageHeader } from "@/components/ui";
 import { getDb } from "@/db";
 import { env } from "@/lib/env";
 import { getTemplate, TEMPLATE_DEFS } from "@/lib/notify/templates";
-import { getSettings } from "@/lib/settings";
+import { getAiSettings, getSettings } from "@/lib/settings";
+import { AiSettingsForm } from "./ai-settings-form";
 import { SettingsForm } from "./settings-form";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { saved } = await searchParams;
   const db = await getDb();
   const settings = await getSettings(db);
+  const aiSettings = await getAiSettings(db);
   const templates = await Promise.all(TEMPLATE_DEFS.map((t) => getTemplate(db, t.key)));
 
   return (
@@ -21,6 +23,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <h2 className="mb-3 text-base font-semibold">Links and reminders</h2>
       <SettingsForm settings={settings} />
+
+      <h2 className="mt-8 mb-3 text-base font-semibold">AI profile writing</h2>
+      <AiSettingsForm settings={aiSettings} mode={env.aiMode} model={env.anthropicModel} />
 
       <h2 className="mt-8 mb-3 text-base font-semibold">Messages</h2>
       <Card className="divide-y divide-slate-100">

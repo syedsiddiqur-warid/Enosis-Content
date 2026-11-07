@@ -19,6 +19,7 @@ import type {
   SectionUpdates,
   Skill,
 } from "@/lib/resources/types";
+import type { FactCheck, ProfileContent } from "@/lib/profiles/types";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -165,6 +166,69 @@ export const requirementCandidates = pgTable(
 );
 
 export type RequirementRow = typeof requirements.$inferSelect;
+
+/** One tailored profile per resource per requirement. Content lives in versions. */
+export const profiles = pgTable(
+  "profiles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requirementId: uuid("requirement_id")
+      .notNull()
+      .references(() => requirements.id, { onDelete: "cascade" }),
+    resourceId: uuid("resource_id")
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("generated"),
+    currentVersion: integer("current_version").notNull().default(0),
+    createdBy: text("created_by").notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("profiles_requirement_resource_unique").on(t.requirementId, t.resourceId)],
+);
+
+export const profileVersions = pgTable(
+  "profile_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    content: jsonb("content").$type<ProfileContent>().notNull(),
+    gaps: jsonb("gaps").$type<string[]>().notNull().default([]),
+    factCheck: jsonb("fact_check").$type<FactCheck>(),
+    source: text("source").notNull(), // ai | offline | admin_edit | ai_revision
+    // The record the profile was written from, for fact-checking and traceability.
+    resourceSnapshot: jsonb("resource_snapshot").$type<ResourceInput>().notNull(),
+    aiCallId: uuid("ai_call_id"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("profile_versions_unique").on(t.profileId, t.version)],
+);
+
+/** Every Claude API call: what was sent, what came back, and how it went. */
+export const aiCalls = pgTable("ai_calls", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  purpose: text("purpose").notNull(), // generate | fact_check | revise
+  requirementId: uuid("requirement_id"),
+  resourceId: uuid("resource_id"),
+  profileId: uuid("profile_id"),
+  resourceUpdatedAt: timestamp("resource_updated_at", { withTimezone: true }),
+  model: text("model").notNull(),
+  attempt: integer("attempt").notNull().default(1),
+  request: jsonb("request").notNull(),
+  response: jsonb("response"),
+  status: text("status").notNull(), // ok | invalid | refusal | error
+  error: text("error"),
+  usage: jsonb("usage"),
+  durationMs: integer("duration_ms"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ProfileRow = typeof profiles.$inferSelect;
+export type ProfileVersionRow = typeof profileVersions.$inferSelect;
 
 /**
  * A task given to someone without an account: a resource asked to update their info,

@@ -11,6 +11,10 @@ import { REQUIREMENT_STATUSES, getRequirement, listCandidates, requestsForRequir
 import { AVAILABILITY_STATUSES } from "@/lib/resources/types";
 import { getSettings } from "@/lib/settings";
 import { addCandidatesAction, removeCandidateAction, sendCandidateRequestsAction } from "../actions";
+import { generateProfileAction } from "../../profiles/actions";
+import { PendingButton } from "@/components/pending-button";
+import { profilesForRequirement } from "@/lib/profiles/service";
+import { PROFILE_STATUSES } from "@/lib/profiles/types";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +87,7 @@ export default async function RequirementPage({ params, searchParams }: { params
   const candidates = await listCandidates(db, id);
   const proposedIds = new Set(candidates.map((c) => c.resource.id));
   const requests = await requestsForRequirement(db, id, [...proposedIds]);
+  const profileMap = await profilesForRequirement(db, id);
   const ranked = rankResources(req, await db.select().from(resources), env.staleAfterDays).filter((m) => !proposedIds.has(m.resource.id));
   const shown = sp.all ? ranked : ranked.slice(0, SHORTLIST_SIZE);
 
@@ -188,6 +193,25 @@ export default async function RequirementPage({ params, searchParams }: { params
                       <span className="text-slate-500">No update request</span>
                     )}
                   </div>
+                  <div className="min-w-44 text-xs">
+                    {profileMap.get(r.id) ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          Profile <Badge tone="brand">{PROFILE_STATUSES.find((s) => s.key === profileMap.get(r.id)!.status)?.label}</Badge>
+                        </div>
+                        <Link href={`/admin/profiles/${profileMap.get(r.id)!.id}`} className="font-medium text-brand underline">
+                          View profile (v{profileMap.get(r.id)!.currentVersion})
+                        </Link>
+                      </div>
+                    ) : (
+                      <>
+                        {open && <div className="mb-1 text-amber-800">Waiting on resource</div>}
+                        <PendingButton formAction={generateProfileAction.bind(null, req.id, r.id)} variant="secondary" className="px-2.5 py-1 text-xs" pendingLabel="Working…">
+                          Generate profile
+                        </PendingButton>
+                      </>
+                    )}
+                  </div>
                   <button
                     formAction={removeCandidateAction.bind(null, req.id, r.id)}
                     className="cursor-pointer rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"
@@ -204,7 +228,7 @@ export default async function RequirementPage({ params, searchParams }: { params
               <Input type="date" name="dueDate" defaultValue={defaultDue} min={today} className="w-auto" />
             </label>
             <Button type="submit">Send update request to ticked</Button>
-            <span className="text-xs text-slate-500">Uses this requirement&apos;s role title in the message. Profile generation arrives in phase 5.</span>
+            <span className="text-xs text-slate-500">Uses this requirement&apos;s role title in the message. Generating a profile can take a minute or two.</span>
           </div>
         </form>
       )}
