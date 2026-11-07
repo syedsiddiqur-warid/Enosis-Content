@@ -108,7 +108,7 @@ async function sendTemplated(db: Db, req: AccessRequestRow, templateKey: Templat
   return result;
 }
 
-export type NewUpdateRequest = { roleTitle: string; clientIndustry?: string; dueDate: string };
+export type NewUpdateRequest = { roleTitle: string; clientIndustry?: string; dueDate: string; requirementId?: string };
 
 /**
  * Asks a resource to review their information. Any earlier open request for the same
@@ -134,6 +134,7 @@ export async function createResourceUpdateRequest(db: Db, resource: ResourceRow,
     .values({
       purpose: "resource_update",
       resourceId: resource.id,
+      requirementId: input.requirementId ?? null,
       recipientEmail: resource.email,
       recipientName: resource.name,
       context: { roleTitle: input.roleTitle, clientIndustry: input.clientIndustry || undefined, resourceName: resource.name },

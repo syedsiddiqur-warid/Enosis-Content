@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { eq, sql } from "drizzle-orm";
 import { createDb } from "@/db/client";
-import { resources } from "@/db/schema";
+import { requirements, resources } from "@/db/schema";
 import { createResource } from "@/lib/resources/service";
 import { resourceInputSchema, type ResourceInput } from "@/lib/resources/types";
 
@@ -211,11 +211,44 @@ const SEED: Partial<ResourceInput>[] = [
   },
 ];
 
+// Fictional prospects for trying out matching.
+const SEED_REQUIREMENTS: (typeof requirements.$inferInsert)[] = [
+  {
+    clientName: "Northwind Payments (sample)",
+    roleTitle: "Senior Full-Stack Engineer",
+    mustHaveSkills: ["TypeScript", "React", "Node.js", "PostgreSQL"],
+    niceToHaveSkills: ["AWS", "Docker", "Redis"],
+    minYears: 5,
+    domain: "FinTech",
+    engagementType: "Dedicated team member",
+    notes: "US-based payments startup. Needs a senior engineer to own the merchant dashboard and settlement APIs. Overlap with EST mornings.",
+    createdBy: "seed@enosisbd.com",
+  },
+  {
+    clientName: "Bluebird Logistics (sample)",
+    roleTitle: "Python Backend Engineer",
+    mustHaveSkills: ["Python", "Django", "PostgreSQL"],
+    niceToHaveSkills: ["Celery", "Google Cloud Platform", "Machine Learning"],
+    minYears: 4,
+    domain: "Logistics",
+    engagementType: "Staff augmentation",
+    notes: "European logistics company extending their route-planning backend. Six-month engagement, likely to extend.",
+    createdBy: "seed@enosisbd.com",
+  },
+];
+
 async function main() {
   const db = await createDb({ migrate: true });
+  const [{ reqCount }] = await db.select({ reqCount: sql<number>`count(*)::int` }).from(requirements);
+  if (reqCount === 0) {
+    const deadline = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await db.insert(requirements).values(SEED_REQUIREMENTS.map((r) => ({ ...r, deadline })));
+    console.log(`Seeded ${SEED_REQUIREMENTS.length} sample requirements.`);
+  }
+
   const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(resources);
   if (count > 0) {
-    console.log(`Database already has ${count} resources; skipping seed.`);
+    console.log(`Database already has ${count} resources; skipping resource seed.`);
     process.exit(0);
   }
 

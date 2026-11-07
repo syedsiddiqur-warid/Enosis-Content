@@ -8,6 +8,7 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import type {
@@ -126,6 +127,45 @@ export const outboundEmails = pgTable("outbound_emails", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** A prospect's staffing need. Resources are matched against it and proposed with tailored profiles. */
+export const requirements = pgTable("requirements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientName: text("client_name").notNull(),
+  roleTitle: text("role_title").notNull(),
+  mustHaveSkills: jsonb("must_have_skills").$type<string[]>().notNull().default([]),
+  niceToHaveSkills: jsonb("nice_to_have_skills").$type<string[]>().notNull().default([]),
+  minYears: real("min_years"),
+  domain: text("domain").notNull().default(""),
+  engagementType: text("engagement_type").notNull().default(""),
+  deadline: date("deadline"),
+  notes: text("notes").notNull().default(""),
+  status: text("status").notNull().default("open"), // open | submitted | won | lost | closed
+  createdBy: text("created_by").notNull(),
+  ...timestamps,
+});
+
+/** A resource the admin chose to propose for a requirement. Phase 5 attaches the tailored profile. */
+export const requirementCandidates = pgTable(
+  "requirement_candidates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requirementId: uuid("requirement_id")
+      .notNull()
+      .references(() => requirements.id, { onDelete: "cascade" }),
+    resourceId: uuid("resource_id")
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    // Score and reasons when the admin picked them, for later reference.
+    scoreAtSelection: integer("score_at_selection"),
+    note: text("note").notNull().default(""),
+    addedBy: text("added_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("requirement_candidates_unique").on(t.requirementId, t.resourceId)],
+);
+
+export type RequirementRow = typeof requirements.$inferSelect;
+
 /**
  * A task given to someone without an account: a resource asked to update their info,
  * or (phase 6) a reviewer asked to review a profile. Access is through secure link tokens.
@@ -136,6 +176,7 @@ export const accessRequests = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     purpose: text("purpose").notNull(), // resource_update | profile_review
     resourceId: uuid("resource_id").references(() => resources.id, { onDelete: "cascade" }),
+    requirementId: uuid("requirement_id").references(() => requirements.id, { onDelete: "set null" }),
     subjectId: uuid("subject_id"), // the profile under review (phase 6)
     recipientEmail: text("recipient_email").notNull(),
     recipientName: text("recipient_name").notNull(),

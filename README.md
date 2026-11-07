@@ -2,12 +2,13 @@
 
 Internal tool for Enosis Solutions to keep resource data current and produce proposal-ready talent profiles.
 
-**Status: Phase 3**
+**Status: Phase 4**
 - Phase 1: admin sign-in, resource data model, admin create/edit/archive, Google Form CSV import, bulk email import.
 - Phase 2: secure links for resources (and reviewers, used from phase 6), editable message templates, email sending (Resend, Postmark, or SendGrid), reminders, optional email code, rate limiting.
 - Phase 3: the resource update form (pre-filled, step by step, autosave) and the admin's highlighted view of what changed.
+- Phase 4: requirements, ranked matching with reasons, choosing who to propose, and update requests per requirement.
 
-Later phases add requirements and matching, AI generation, the reviewer page, and Canva export.
+Later phases add AI profile generation, the reviewer page, and Canva export.
 
 ## Stack
 
@@ -136,6 +137,33 @@ When a resource opens their link they get a short, mobile-friendly form, already
   - The request is marked complete, the admin who sent it gets an email, and the person sees the thank-you message (optionally also emailed; see Settings).
 - **Requests → View changes** (also linked from the resource page and the admin email) shows a highlighted before/after of everything that changed, with added and removed lines marked.
 
+## Requirements and matching
+
+**Requirements** holds each prospect's staffing request:
+- client, role title, must-have and nice-to-have skills, minimum years, domain, engagement type, deadline, and notes or a pasted job description.
+- **Find skills in this text** scans the notes for skill names already in our database and lets you add each as must-have or nice-to-have.
+
+Opening a requirement shows every active resource **ranked by a match score out of 100**:
+
+| Part | Points | How |
+| --- | --- | --- |
+| Must-have skills | 50 | Share of must-haves found in their tech stack or project technologies. A related skill (e.g. "AWS" ↔ "AWS Lambda") counts 60%. |
+| Nice-to-have skills | 15 | Same, for nice-to-haves |
+| Experience | 15 | Total years compared with the minimum |
+| Availability | 10 | Available 100%, partially 60%, unknown 50%, allocated 20% (90% if free before the deadline) |
+| Domain | 5 | A project or listed industry matches the requirement's domain |
+| Data freshness | 5 | Full if updated within the stale threshold, then declining |
+
+Parts that don't apply (no nice-to-haves, no minimum years, no domain) are left out and the score is scaled back to 100.
+Skill names are normalized before comparing, so "React.js" = "React", "Postgres" = "PostgreSQL", "JS" = "JavaScript", "C#" = "c sharp", and so on.
+
+Each row shows why: matched must-haves (with how many projects used them), missing must-haves in red, matched nice-to-haves, availability, and freshness. A score breakdown is one click away.
+
+- **Nothing is selected automatically.** Tick people and click **Add ticked to proposal**.
+- In the **Proposed** list, send update requests to the people you tick. The message uses the requirement's role title, and stale records are pre-ticked. Skip anyone whose record is current.
+- Each proposed person shows their latest update request for this requirement and a link to their changes.
+- A resource's page lists the requirements they're proposed for.
+
 ## Data model
 
 - `resources` — one row per person. List sections (tech stack by category, education, achievements, projects) are validated JSONB, read and written as a whole. Each section tracks when and by whom (admin, import, or the resource) it was last changed.
@@ -147,6 +175,8 @@ When a resource opens their link they get a short, mobile-friendly form, already
 - `access_tokens` — hashed link tokens; a request can have several (initial, resend, reminder).
 - `access_events` — audit log of link activity.
 - `message_templates`, `app_settings` — editable wording and settings.
+- `requirements` — prospects' staffing requests.
+- `requirement_candidates` — who was proposed for each requirement, with their score when added (phase 5 attaches their tailored profile).
 
 Project client names are stored for internal use only and will never be shown in generated profiles.
 
@@ -158,7 +188,7 @@ Project client names are stored for internal use only and will never be shown in
 | `npm run build` / `npm start` | Production build and server |
 | `npm run db:generate` | Create a migration after editing `src/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
-| `npm run db:seed` | Add the 5 fictional sample resources (only if the table is empty) |
+| `npm run db:seed` | Add the 5 fictional sample resources and 2 sample requirements (each only if its table is empty) |
 | `npm run typecheck`, `npm run lint` | Checks |
 
 ## Deploying

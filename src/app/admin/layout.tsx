@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { devInboxEnabled } from "@/lib/env";
 
 const nav = [
+  { href: "/admin/requirements", label: "Requirements" },
   { href: "/admin/resources", label: "Resources" },
   { href: "/admin/requests", label: "Requests" },
   { href: "/admin/import", label: "Import" },

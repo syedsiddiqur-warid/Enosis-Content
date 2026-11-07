@@ -17,6 +17,7 @@ import {
 import { setArchivedAction } from "../actions";
 import { RequestActions, RequestStatusBadge } from "@/components/request-ui";
 import { listRequests } from "@/lib/links/service";
+import { requirementsForResource } from "@/lib/requirements";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
   if (!r) notFound();
   const versions = await getVersions(db, id);
   const requests = await listRequests(db, { resourceId: id, limit: 5 });
+  const proposedFor = await requirementsForResource(db, id);
   const years = totalYears(r);
   const availability = AVAILABILITY_STATUSES.find((s) => s.key === r.availabilityStatus)?.label;
 
@@ -217,6 +219,21 @@ export default async function ResourcePage({ params, searchParams }: { params: P
         </div>
 
         <aside className="space-y-5">
+          {proposedFor.length > 0 && (
+            <Card className="p-4 text-sm">
+              <h3 className="mb-2 font-semibold">Proposed for</h3>
+              <ul className="space-y-1">
+                {proposedFor.map(({ requirement: q }) => (
+                  <li key={q.id}>
+                    <Link href={`/admin/requirements/${q.id}`} className="text-brand hover:underline">
+                      {q.roleTitle}
+                    </Link>
+                    <span className="text-xs text-slate-500"> · {q.clientName}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           <Card className="p-4 text-sm">
             <h3 className="mb-2 font-semibold">Update requests</h3>
             {requests.length === 0 ? (

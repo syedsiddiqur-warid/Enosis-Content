@@ -9,11 +9,14 @@ export function TagInput({
   onChange,
   placeholder,
   id,
+  list,
 }: {
   value: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
   id?: string;
+  /** id of a <datalist> with suggestions */
+  list?: string;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -52,6 +55,7 @@ export function TagInput({
       ))}
       <input
         id={id}
+        list={list}
         className="min-w-32 flex-1 border-0 bg-transparent p-0.5 text-sm outline-none"
         value={draft}
         placeholder={value.length === 0 ? placeholder : ""}
