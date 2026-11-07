@@ -72,3 +72,18 @@ export async function getAiSettings(db: Db): Promise<AiSettings> {
 export async function saveAiSettings(db: Db, value: AiSettings, by: string) {
   await saveRow(db, AI_KEY, value, by);
 }
+
+// ---- Reminder job log: when the last reminder run happened and what it did ----
+
+const REMINDER_RUN_KEY = "reminders:last_run";
+
+export type LastReminderRun = { at: string; by: string; checked: number; sent: number; blocked: number; failed: number };
+
+export async function getLastReminderRun(db: Db): Promise<LastReminderRun | null> {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, REMINDER_RUN_KEY));
+  return (row?.value as LastReminderRun | undefined) ?? null;
+}
+
+export async function saveLastReminderRun(db: Db, run: LastReminderRun) {
+  await saveRow(db, REMINDER_RUN_KEY, run, run.by);
+}

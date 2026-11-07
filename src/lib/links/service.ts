@@ -1,12 +1,12 @@
 import "server-only";
-import { and, desc, eq, gt, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { accessEvents, accessRequests, accessTokens, resources, reviewers, type AccessRequestRow, type ResourceRow } from "@/db/schema";
 import { hashToken, randomToken } from "@/lib/crypto";
 import { sendEmail, type SendResult } from "@/lib/email/mailer";
 import { env } from "@/lib/env";
 import { fill, getTemplate, toHtml, type TemplateKey } from "@/lib/notify/templates";
-import { getSettings } from "@/lib/settings";
+import { getSettings, saveLastReminderRun, type LastReminderRun } from "@/lib/settings";
 import { baseUrl } from "@/lib/url";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -324,28 +324,42 @@ export async function listEvents(db: Db, requestIds: string[]) {
  * Sends the automatic friendly reminder for open requests whose due date is close.
  * Skips requests created in the last 24 hours and those that already got the maximum.
  */
-export async function runReminders(db: Db) {
+export type ReminderRun = LastReminderRun;
+
+export async function runReminders(db: Db, by = "scheduler"): Promise<ReminderRun> {
   const settings = await getSettings(db);
-  if (settings.maxReminders === 0) return { sent: 0, checked: 0 };
   const now = new Date();
-  const remindOnOrBefore = addDaysIso(settings.reminderDaysBeforeDue, now);
-  const candidates = await db
-    .select()
-    .from(accessRequests)
-    .where(
-      and(
-        isNull(accessRequests.completedAt),
-        isNull(accessRequests.revokedAt),
-        gt(accessRequests.expiresAt, now),
-        lte(accessRequests.dueDate, remindOnOrBefore),
-        lte(accessRequests.createdAt, new Date(now.getTime() - DAY_MS)),
-        sql`${accessRequests.remindersSent} < ${settings.maxReminders}`,
-      ),
-    );
-  let sent = 0;
-  for (const req of candidates) {
-    const result = await remindRequest(db, req.id, "automatic reminder");
-    if (result.status === "sent" || result.status === "dev_inbox") sent++;
+  const run: ReminderRun = { at: now.toISOString(), by, checked: 0, sent: 0, blocked: 0, failed: 0 };
+  if (settings.maxReminders > 0) {
+    const remindOnOrBefore = addDaysIso(settings.reminderDaysBeforeDue, now);
+    const candidates = await db
+      .select()
+      .from(accessRequests)
+      .where(
+        and(
+          isNull(accessRequests.completedAt),
+          isNull(accessRequests.revokedAt),
+          gt(accessRequests.expiresAt, now),
+          // Due soon, or (with no due date) the link itself is about to expire.
+          or(lte(accessRequests.dueDate, remindOnOrBefore), and(isNull(accessRequests.dueDate), lte(accessRequests.expiresAt, new Date(now.getTime() + (settings.reminderDaysBeforeDue + 1) * DAY_MS)))),
+          lte(accessRequests.createdAt, new Date(now.getTime() - DAY_MS)),
+          // At most one reminder a day, even if the job runs more often or is started by hand.
+          or(isNull(accessRequests.lastReminderAt), lte(accessRequests.lastReminderAt, new Date(now.getTime() - 20 * 60 * 60 * 1000))),
+          sql`${accessRequests.remindersSent} < ${settings.maxReminders}`,
+        ),
+      );
+    run.checked = candidates.length;
+    for (const req of candidates) {
+      try {
+        const result = await remindRequest(db, req.id, "automatic reminder");
+        if (result.status === "sent" || result.status === "dev_inbox") run.sent++;
+        else if (result.status === "blocked") run.blocked++;
+        else run.failed++;
+      } catch {
+        run.failed++;
+      }
+    }
   }
-  return { sent, checked: candidates.length };
+  await saveLastReminderRun(db, run);
+  return run;
 }

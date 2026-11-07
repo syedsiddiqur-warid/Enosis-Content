@@ -1,0 +1,23 @@
+# Daily reminder job for hosts without a built-in scheduler (Vercel uses vercel.json instead).
+# Add repository secrets APP_URL (e.g. https://talent.enosisbd.com) and CRON_SECRET to turn it on.
+name: Daily reminders
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 10:00 in Dhaka
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the reminder job
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL or CRON_SECRET secret not set; skipping."
+            exit 0
+          fi
+          curl --fail --silent --show-error -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/reminders"

@@ -29,7 +29,19 @@ export const env = {
   canvaRedirectUri: process.env.CANVA_REDIRECT_URI || "http://127.0.0.1:3100/api/canva/callback",
   // Optional: path to Chrome or Edge for the in-app PDF. Auto-detected when empty.
   chromePath: process.env.CHROME_PATH || "",
+  // Optional: address the server can reach itself on (e.g. http://127.0.0.1:3000), used for the in-app PDF.
+  internalUrl: (process.env.INTERNAL_URL || "").replace(/\/$/, ""),
   isProduction: process.env.NODE_ENV === "production",
 };
 
-export const devInboxEnabled = env.emailProvider === "dev";
+export function isLocalUrl(url: string) {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+
+// The dev inbox shows every message, sign-in links included, so it never runs on a deployed site.
+export const devInboxEnabled = env.emailProvider === "dev" && (!env.isProduction || isLocalUrl(env.appUrl));

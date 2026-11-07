@@ -2,17 +2,15 @@
 
 Internal tool for Enosis Solutions to keep resource data current and produce proposal-ready talent profiles.
 
-**Status: Phase 7**
+**Status: Phase 8 (all phases built)**
 - Phase 1: admin sign-in, resource data model, admin create/edit/archive, Google Form CSV import, bulk email import.
 - Phase 2: secure links for resources (and reviewers, used from phase 6), editable message templates, email sending (Resend, Postmark, or SendGrid), reminders, optional email code, rate limiting.
 - Phase 3: the resource update form (pre-filled, step by step, autosave) and the admin's highlighted view of what changed.
 - Phase 4: requirements, ranked matching with reasons, choosing who to propose, and update requests per requirement.
 - Phase 5: AI profile generation with Claude, house style and length settings, and a fact-check pass.
 - Phase 6: the reviewer page (no login): formatted profile, inline edits, suggestions, approve or request changes, Claude revision of suggested sections, and version comparison.
-
 - Phase 7: export approved profiles to Canva (brand template autofill → PDF), with an in-app PDF from the same template as the fallback.
-
-Phase 8 adds the dashboard, polish, and deployment.
+- Phase 8: the dashboard, reminder improvements, setup checks, and deployment (Docker image, Vercel, health check).
 
 ## Stack
 
@@ -42,7 +40,7 @@ npm.cmd run dev
 
 The app always runs on port **3100** (port 3000 is often taken by other local apps).
 
-Open http://localhost:3100, enter an admin email, then open the **dev inbox** at http://localhost:3100/dev/inbox to click the sign-in link. In dev mode no email leaves your machine.
+Open http://localhost:3100 (you land on the **Dashboard**), enter an admin email, then open the **dev inbox** at http://localhost:3100/dev/inbox to click the sign-in link. In dev mode no email leaves your machine.
 
 > PGlite allows one process at a time. Stop `npm run dev` before running `npm run db:*` scripts.
 > To start over, stop the server, delete `.data/`, and run `npm run db:setup` again.
@@ -70,6 +68,7 @@ Open http://localhost:3100, enter an admin email, then open the **dev inbox** at
 | `EMAIL_FROM` | Sender name and address |
 | `SAMPLE_EMAIL_DOMAIN` | Domain for generated sample addresses |
 | `STALE_AFTER_DAYS` | Records older than this are flagged stale (default 60) |
+| `INTERNAL_URL` | Optional. An address the server can reach itself on (e.g. `http://127.0.0.1:3000`), used by the in-app PDF. The Docker image sets it |
 
 ## Importing our Google Form data
 
@@ -94,6 +93,18 @@ The form has no email question, so imported people get a **sample address** like
 When you have the real list, upload a CSV with `Name` and `Email` columns under **Import → Real email addresses**. Matching addresses replace the samples and are marked verified.
 
 Test files with fictional data are in `samples/` (regenerate with `npx tsx scripts/make-sample-csv.ts`).
+
+## Dashboard
+
+The first page after signing in (`/admin`):
+
+- **Totals**: open requirements, profiles waiting on you, open links (and how many are overdue), stale records, and resources still on a sample email.
+- **Profile pipeline**: every profile by status (Generated → In review → Changes requested → Revised → Approved → Exported) with the next step for each, and a red note when an AI revision failed.
+- **Open links**: update and review requests that haven't been answered, soonest due first, flagged *overdue* or *link expires soon*, with Resend, Remind, and Revoke.
+- **Reminders**: the current reminder rule, when the job last ran and what it sent, and **Run reminders now**.
+- **Open requirements** with days left to the deadline, **stale records** with a one-click update request, and **updates submitted this week**.
+- **Search and filter**: the search box matches people, clients, and roles across the pipeline, open links, and stale records; filter the pipeline by status or requirement.
+- **Setup checks**: anything misconfigured (no email provider, weak `SECRET_KEY`, no `CRON_SECRET`, no Claude key, no Chrome) is listed at the top. The same checks are printed when the server starts.
 
 ## Secure links (no login for resources and reviewers)
 
@@ -120,8 +131,11 @@ Each email is sent as plain text plus a simple branded HTML version with an "Ope
 ### Reminders
 
 `GET /api/cron/reminders` with `Authorization: Bearer $CRON_SECRET` sends the friendly reminder for open requests whose due date is within the configured number of days (default 2).
-It skips requests created in the last 24 hours and never sends more than the maximum (default 1).
-`vercel.json` runs it daily on Vercel. Elsewhere, call it from any scheduler.
+Requests without a due date are reminded when their link is about to expire.
+It skips requests created in the last 24 hours, never reminds the same request twice within 20 hours, and never sends more than the maximum (default 1).
+Each run is recorded and shown on the dashboard, where **Run reminders now** does the same thing by hand.
+
+Scheduling: `vercel.json` runs it daily on Vercel. On other hosts, the GitHub Actions workflow `.github/workflows/reminders.yml` calls it daily once you add the repository secrets `APP_URL` and `CRON_SECRET`; any other scheduler (cron, a cloud scheduler) works too.
 
 ### Email safety
 
@@ -289,8 +303,39 @@ Project client names are stored for internal use only and will never be shown in
 
 ## Deploying
 
-1. Create a Supabase project and copy its Postgres connection string into `DATABASE_URL`.
-2. Deploy to Vercel (or any Node host) with the environment variables above. Set `APP_URL` to the public URL and leave `ADMIN_ALLOWED_DOMAIN` empty unless every address on the domain should be an admin.
-3. Run `npm run db:migrate` against the production database (the app also applies pending migrations on startup).
-4. Set `EMAIL_PROVIDER` and its API key, and verify your sending domain with the provider so messages from `EMAIL_FROM` are delivered.
-5. Set `CRON_SECRET` so the daily reminder job can run.
+### Before you deploy
+
+- **Database**: create a Postgres database (Supabase recommended) and set `DATABASE_URL`. Migrations run automatically when the server starts (or run `npm run db:migrate`). PGlite is for local use only.
+- **Secrets**: set `SECRET_KEY` (32+ random characters), `AUDIT_SALT`, and `CRON_SECRET` to random values, for example from `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
+  A deployed site **refuses to start** without a proper `SECRET_KEY`.
+- **Address**: set `APP_URL` to the public `https://` address. Emailed links use it.
+- **Admins**: set `ADMIN_EMAILS` to the people who may sign in, and leave `ADMIN_ALLOWED_DOMAIN` empty unless everyone on the domain should be an admin.
+- **Email**: set `EMAIL_PROVIDER` (resend, postmark, or sendgrid) and its key, and verify your sending domain with the provider so mail from `EMAIL_FROM` is delivered.
+  The dev inbox is turned off on a deployed site, so sign-in links only arrive by real email.
+- **Claude**: set `ANTHROPIC_API_KEY`, or profiles are plain offline drafts.
+- **Canva** (optional): register the deployed callback URL (`https://<your-domain>/api/canva/callback`) on the Canva integration and set `CANVA_REDIRECT_URI` to the same value.
+
+After deploying, open the dashboard: the setup checks at the top should be empty, apart from optional notes.
+
+### Option A: Docker (recommended, everything works)
+
+The `Dockerfile` builds a small production image with Chromium included, so the in-app PDF works.
+
+```bash
+docker build -t talent-profile-studio .
+docker run -p 3000:3000 --env-file .env.production talent-profile-studio
+```
+
+Runs on any container host (Azure App Service, AWS, Google Cloud Run, Render, Railway, Fly.io, or your own server) behind HTTPS.
+`/api/health` returns `{"ok":true}` when the app can reach its database, for the host's health check.
+Schedule reminders with the GitHub Actions workflow or the host's scheduler (see Reminders).
+
+### Option B: Vercel
+
+Works for everything except the in-app PDF, because Vercel's servers have no Chrome. Use Canva export there, or run the PDF on Docker.
+`vercel.json` already schedules the daily reminder job. `DATABASE_URL` is required (Vercel has no lasting disk for PGlite).
+
+### Notes
+
+- The link-page rate limiter is in memory per server. If you run several instances, put a shared limiter (for example Upstash) in front of `/r/` and `/review/`.
+- `npm run build` then `npm start` runs a production build locally on port 3100. With `APP_URL` on localhost the dev inbox stays available, so you can try it without a real email provider.

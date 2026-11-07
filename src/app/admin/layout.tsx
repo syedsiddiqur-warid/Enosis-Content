@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { devInboxEnabled } from "@/lib/env";
 
 const nav = [
+  { href: "/admin", label: "Dashboard" },
   { href: "/admin/requirements", label: "Requirements" },
   { href: "/admin/resources", label: "Resources" },
   { href: "/admin/requests", label: "Requests" },
@@ -18,11 +19,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link href="/admin/resources" className="leading-tight">
+          <Link href="/admin" className="leading-tight">
             <span className="block text-[10px] font-semibold uppercase tracking-wider text-brand">Enosis Solutions</span>
             <span className="block text-sm font-semibold text-slate-900">Talent Profile Studio</span>
           </Link>
-          <nav className="flex gap-1 text-sm">
+          <nav className="flex max-w-full gap-1 overflow-x-auto text-sm whitespace-nowrap">
             {nav.map((n) => (
               <Link key={n.href} href={n.href} className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">
                 {n.label}

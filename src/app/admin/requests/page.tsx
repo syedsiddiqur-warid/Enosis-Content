@@ -43,7 +43,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader
         title="Requests"
-        description="Update requests sent to resources, with link status and activity. Review requests join this list in phase 6."
+        description="Update requests sent to resources and review requests sent to reviewers, with link status and activity."
         actions={
           <Link href="/admin/resources" className="text-sm text-brand underline">
             Select resources to send a request

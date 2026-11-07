@@ -5,7 +5,7 @@ import { devInboxEnabled } from "@/lib/env";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage() {
-  if (await getSession()) redirect("/admin/resources");
+  if (await getSession()) redirect("/admin");
 
   return (
     <main className="flex min-h-screen items-center justify-center p-4">

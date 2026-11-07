@@ -13,7 +13,9 @@ function payload(profileId: string, version: number, exp: number) {
 export async function signedPrintUrl(profileId: string, version: number) {
   const exp = Date.now() + TTL_MS;
   const sig = sign(payload(profileId, version, exp), env.secretKey);
-  return `${await baseUrl()}/print/profiles/${profileId}?v=${version}&exp=${exp}&sig=${sig}`;
+  // INTERNAL_URL lets the headless browser reach the app directly (e.g. inside a container) instead of going out and back in.
+  const base = env.internalUrl || (await baseUrl());
+  return `${base}/print/profiles/${profileId}?v=${version}&exp=${exp}&sig=${sig}`;
 }
 
 export function verifyPrintSignature(profileId: string, version: number, exp: number, sig: string) {

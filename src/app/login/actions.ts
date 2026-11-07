@@ -13,7 +13,7 @@ export async function requestLinkAction(_prev: unknown, formData: FormData) {
 
 export async function verifyAction(formData: FormData) {
   const ok = await signInWithToken(String(formData.get("token") ?? ""));
-  redirect(ok ? "/admin/resources" : "/auth/verify?error=invalid");
+  redirect(ok ? "/admin" : "/auth/verify?error=invalid");
 }
 
 export async function signOutAction() {
